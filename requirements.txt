@@ -1,2 +1,2 @@
 streamlit
-supabase
+supabase>=2.15.0
