@@ -11,7 +11,7 @@ st.set_page_config(page_title="TuteurTD", page_icon="📚", layout="wide")
 # "Secrets" de Streamlit Community Cloud :
 #
 # SUPABASE_URL = "https://xxxxxxxx.supabase.co"
-# SUPABASE_ANON_KEY = "eyJ...."   (clé "anon public" du projet)
+# SUPABASE_ANON_KEY = "eyJ...." (clé "anon public" du projet)
 
 @st.cache_resource
 def get_client() -> Client:
@@ -38,7 +38,7 @@ def charger_repetiteurs_actifs():
         return res.data
     except Exception as e:
         st.error("Impossible de charger les profils pour le moment. Réessayez dans un instant.")
-        st.exception(e)  # TEMPORAIRE — à retirer une fois le bug résolu
+        st.exception(e) # TEMPORAIRE — à retirer une fois le bug résolu
         return []
 
 
@@ -49,6 +49,7 @@ def inserer_repetiteur(payload):
         return True
     except Exception as e:
         st.error("L'enregistrement a échoué. Vérifiez vos informations et réessayez.")
+        st.exception(e) # TEMPORAIRE — à retirer une fois le bug résolu
         return False
 
 
@@ -57,8 +58,9 @@ def charger_repetiteurs_admin(client_admin):
     try:
         res = client_admin.table("repetiteurs").select("*").order("created_at", desc=True).execute()
         return res.data
-    except Exception:
+    except Exception as e:
         st.error("Impossible de charger la liste admin.")
+        st.exception(e) # TEMPORAIRE — à retirer une fois le bug résolu
         return []
 
 
@@ -66,8 +68,9 @@ def toggle_statut_admin(client_admin, repet_id, nouveau_statut):
     try:
         client_admin.table("repetiteurs").update({"statut": nouveau_statut}).eq("id", repet_id).execute()
         return True
-    except Exception:
+    except Exception as e:
         st.error("La mise à jour a échoué (droits admin refusés ?).")
+        st.exception(e) # TEMPORAIRE — à retirer une fois le bug résolu
         return False
 
 
@@ -184,17 +187,14 @@ h1, h2, h3, p, span, label, div { color: var(--text); }
     text-align: center; padding: 36px 16px; color: var(--muted);
     border: 1px dashed var(--border); border-radius: var(--radius);
 }
-.status { display: inline-block; padding: 3px 8px; border-radius: 999px; font-size: 0.72rem; font-weight: 700; }
-.status.actif { background: rgba(45,212,191,0.15); color: var(--teal); }
-.status.attente { background: rgba(251,191,36,0.15); color: var(--warning); }
-.stTabs [data-baseweb="tab"] { color: var(--muted); }
-.stTabs [aria-selected="true"] { color: var(--teal) !important; }
+.status {
+    font-size: 0.78rem; font-weight: 600; padding: 3px 10px; border-radius: 999px;
+}
+.status.actif { background: rgba(45, 212, 191, 0.15); color: var(--teal); }
+.status.attente { background: rgba(251, 191, 36, 0.15); color: var(--warning); }
 </style>
 """, unsafe_allow_html=True)
 
-# ------------------------------------------------------------------
-# HEADER
-# ------------------------------------------------------------------
 st.markdown("""
 <div class="topbar">
   <div class="logo">T</div>
@@ -205,10 +205,10 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-tab_parent, tab_tuteur, tab_admin = st.tabs(["👨‍👩‍👧 Parent", "📚 Répétiteur", "🛠️ Admin"])
+tab_parent, tab_tuteur, tab_admin = st.tabs(["👨‍👩‍👧 Parent", "👩‍🏫 Répétiteur", "🛠️ Admin"])
 
 # ------------------------------------------------------------------
-# ONGLET PARENT
+# ONGLET PARENT (recherche)
 # ------------------------------------------------------------------
 with tab_parent:
     repetiteurs = charger_repetiteurs_actifs()
