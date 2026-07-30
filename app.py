@@ -44,6 +44,7 @@ def charger_repetiteurs_actifs():
 
 def inserer_repetiteur(payload):
     """Insertion publique : la RLS n'autorise que statut='attente'."""
+    st.write("DEBUG payload envoyé à Supabase :", payload) # TEMPORAIRE — à retirer une fois le bug résolu
     try:
         supabase.table("repetiteurs").insert(payload).execute()
         return True
