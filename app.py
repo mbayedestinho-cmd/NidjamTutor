@@ -38,6 +38,7 @@ def charger_repetiteurs_actifs():
         return res.data
     except Exception as e:
         st.error("Impossible de charger les profils pour le moment. Réessayez dans un instant.")
+        st.exception(e)  # TEMPORAIRE — à retirer une fois le bug résolu
         return []
 
 
