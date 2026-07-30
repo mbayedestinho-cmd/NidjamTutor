@@ -1,97 +1,107 @@
 import streamlit as st
 import urllib.parse
+from supabase import create_client, Client
 
 st.set_page_config(page_title="TuteurTD", page_icon="📚", layout="wide")
 
 # ------------------------------------------------------------------
-# DONNÉES DE TEST (à remplacer par Supabase plus tard)
+# CONNEXION SUPABASE
 # ------------------------------------------------------------------
-DATA_INITIALE = [
-    {
-        "id": 1,
-        "nom": "Abakar Moussa",
-        "quartier": "Klemat",
-        "zones_couvertes": ["Klemat", "Moursal", "Diguel"],
-        "matieres": ["Mathématiques", "Physique"],
-        "niveaux": ["Collège", "Lycée"],
-        "experience": "+3 ans",
-        "tarif_horaire": 3000,
-        "telephone": "23566000001",
-        "presentation": "Étudiant en 3e année de génie civil à l'université de N'Djamena. "
-                         "3 ans d'expérience en soutien scolaire, spécialisé bac scientifique.",
-    },
-    {
-        "id": 2,
-        "nom": "Fatimé Hassan",
-        "quartier": "Sabangali",
-        "zones_couvertes": ["Sabangali", "Farcha"],
-        "matieres": ["Français", "Anglais"],
-        "niveaux": ["Primaire", "Collège"],
-        "experience": "1-2 ans",
-        "tarif_horaire": 2000,
-        "telephone": "23566000002",
-        "presentation": "Diplômée en lettres modernes, passionnée par la pédagogie pour "
-                         "les plus jeunes. Méthode ludique et patiente.",
-    },
-    {
-        "id": 3,
-        "nom": "Ibrahim Kalzeubé",
-        "quartier": "Amriguebe",
-        "zones_couvertes": ["Amriguebe", "Chagoua", "Walia"],
-        "matieres": ["Mathématiques", "Physique", "Chimie"],
-        "niveaux": ["Lycée", "Terminale"],
-        "experience": "+3 ans",
-        "tarif_horaire": 3500,
-        "telephone": "23566000003",
-        "presentation": "Professeur vacataire au lycée, spécialiste préparation bac. "
-                         "Taux de réussite élevé pour mes élèves de terminale.",
-    },
-    {
-        "id": 4,
-        "nom": "Achta Djimet",
-        "quartier": "Dembé",
-        "zones_couvertes": ["Dembé", "Gassi", "Ridina"],
-        "matieres": ["Anglais", "Français"],
-        "niveaux": ["Collège", "Lycée"],
-        "experience": "Débutant",
-        "tarif_horaire": 1500,
-        "telephone": "23566000004",
-        "presentation": "Jeune diplômée en anglais, motivée et disponible en semaine "
-                         "comme le week-end.",
-    },
-    {
-        "id": 5,
-        "nom": "Mahamat Saleh",
-        "quartier": "Moursal",
-        "zones_couvertes": ["Moursal", "Klemat"],
-        "matieres": ["Mathématiques", "Informatique"],
-        "niveaux": ["Collège", "Lycée", "Terminale"],
-        "experience": "1-2 ans",
-        "tarif_horaire": 2500,
-        "telephone": "23566000005",
-        "presentation": "Étudiant en informatique, donne aussi des bases de "
-                         "programmation en plus des maths classiques.",
-    },
-]
+# À mettre dans .streamlit/secrets.toml (en local) ou dans les
+# "Secrets" de Streamlit Community Cloud :
+#
+# SUPABASE_URL = "https://xxxxxxxx.supabase.co"
+# SUPABASE_ANON_KEY = "eyJ...."   (clé "anon public" du projet)
+
+@st.cache_resource
+def get_client() -> Client:
+    return create_client(st.secrets["SUPABASE_URL"], st.secrets["SUPABASE_ANON_KEY"])
+
+
+supabase = get_client()
 
 TOUS_NIVEAUX = ["Primaire", "Collège", "Lycée", "Terminale"]
-
-if "repetiteurs" not in st.session_state:
-    st.session_state.repetiteurs = [dict(r, statut="actif") for r in DATA_INITIALE]
-    st.session_state.next_id = 6
-
-
-def toutes_matieres():
-    return sorted({m for r in st.session_state.repetiteurs for m in r["matieres"]})
-
-
-def tous_quartiers():
-    return sorted({z for r in st.session_state.repetiteurs for z in r["zones_couvertes"]})
 
 
 def initiales(nom):
     parts = nom.split()
     return "".join(p[0] for p in parts[:2]).upper() if parts else "TR"
+
+
+# ------------------------------------------------------------------
+# ACCÈS DONNÉES
+# ------------------------------------------------------------------
+def charger_repetiteurs_actifs():
+    """Lecture publique (clé anon) : la RLS ne renvoie que statut='actif'."""
+    try:
+        res = supabase.table("repetiteurs").select("*").order("created_at", desc=True).execute()
+        return res.data
+    except Exception as e:
+        st.error("Impossible de charger les profils pour le moment. Réessayez dans un instant.")
+        return []
+
+
+def inserer_repetiteur(payload):
+    """Insertion publique : la RLS n'autorise que statut='attente'."""
+    try:
+        supabase.table("repetiteurs").insert(payload).execute()
+        return True
+    except Exception as e:
+        st.error("L'enregistrement a échoué. Vérifiez vos informations et réessayez.")
+        return False
+
+
+def charger_repetiteurs_admin(client_admin):
+    """Lecture complète (tous statuts) — nécessite un client authentifié admin."""
+    try:
+        res = client_admin.table("repetiteurs").select("*").order("created_at", desc=True).execute()
+        return res.data
+    except Exception:
+        st.error("Impossible de charger la liste admin.")
+        return []
+
+
+def toggle_statut_admin(client_admin, repet_id, nouveau_statut):
+    try:
+        client_admin.table("repetiteurs").update({"statut": nouveau_statut}).eq("id", repet_id).execute()
+        return True
+    except Exception:
+        st.error("La mise à jour a échoué (droits admin refusés ?).")
+        return False
+
+
+# ------------------------------------------------------------------
+# SESSION ADMIN (Supabase Auth)
+# ------------------------------------------------------------------
+def get_admin_client():
+    """
+    Retourne un client Supabase authentifié en tant qu'admin si une
+    session valide existe dans st.session_state, sinon None.
+    """
+    session = st.session_state.get("admin_session")
+    if not session:
+        return None
+    client = create_client(st.secrets["SUPABASE_URL"], st.secrets["SUPABASE_ANON_KEY"])
+    try:
+        client.auth.set_session(session["access_token"], session["refresh_token"])
+        return client
+    except Exception:
+        st.session_state.pop("admin_session", None)
+        return None
+
+
+def admin_login(email, mot_de_passe):
+    try:
+        client = create_client(st.secrets["SUPABASE_URL"], st.secrets["SUPABASE_ANON_KEY"])
+        auth_res = client.auth.sign_in_with_password({"email": email, "password": mot_de_passe})
+        st.session_state.admin_session = {
+            "access_token": auth_res.session.access_token,
+            "refresh_token": auth_res.session.refresh_token,
+        }
+        return True
+    except Exception:
+        st.error("Identifiants incorrects.")
+        return False
 
 
 # ------------------------------------------------------------------
@@ -112,7 +122,6 @@ st.markdown("""
     --radius: 16px;
     --shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
 }
-
 .stApp {
     background:
         radial-gradient(ellipse at 20% 0%, rgba(45, 212, 191, 0.12), transparent 50%),
@@ -122,8 +131,6 @@ st.markdown("""
 }
 [data-testid="stHeader"] { background: transparent; }
 h1, h2, h3, p, span, label, div { color: var(--text); }
-
-/* Header */
 .topbar { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
 .logo {
     width: 42px; height: 42px; border-radius: 12px;
@@ -132,8 +139,6 @@ h1, h2, h3, p, span, label, div { color: var(--text); }
 }
 .brand h1 { font-size: 1.35rem; letter-spacing: -0.02em; margin: 0; }
 .brand p { color: var(--muted); font-size: 0.82rem; margin: 0; }
-
-/* Hero */
 .hero {
     background: linear-gradient(135deg, rgba(45, 212, 191, 0.1), rgba(99, 102, 241, 0.08));
     border: 1px solid var(--border); border-radius: var(--radius);
@@ -141,16 +146,12 @@ h1, h2, h3, p, span, label, div { color: var(--text); }
 }
 .hero h2 { font-size: 1.45rem; margin-bottom: 6px; }
 .hero p { color: var(--muted); font-size: 0.95rem; margin: 0; }
-
-/* Stats */
 .stat {
     background: var(--surface); border: 1px solid var(--border);
     border-radius: 12px; padding: 12px; text-align: center;
 }
 .stat strong { display: block; font-size: 1.25rem; color: var(--teal); }
 .stat span { color: var(--muted); font-size: 0.78rem; }
-
-/* Cards */
 .card {
     background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
     padding: 16px; box-shadow: var(--shadow); margin-bottom: 14px;
@@ -172,14 +173,12 @@ h1, h2, h3, p, span, label, div { color: var(--text); }
 .card p.desc { color: var(--muted); font-size: 0.86rem; }
 .price { font-weight: 700; color: var(--text); font-size: 0.95rem; }
 .price span { color: var(--muted); font-weight: 500; font-size: 0.78rem; }
-
 .btn-wa {
     background: #128C7E; color: white !important; display: inline-flex; align-items: center;
     gap: 6px; padding: 9px 14px; border-radius: 10px; font-weight: 600; font-size: 0.86rem;
     text-decoration: none; margin-top: 8px;
 }
 .btn-wa:hover { filter: brightness(1.1); }
-
 .empty {
     text-align: center; padding: 36px 16px; color: var(--muted);
     border: 1px dashed var(--border); border-radius: var(--radius);
@@ -187,16 +186,6 @@ h1, h2, h3, p, span, label, div { color: var(--text); }
 .status { display: inline-block; padding: 3px 8px; border-radius: 999px; font-size: 0.72rem; font-weight: 700; }
 .status.actif { background: rgba(45,212,191,0.15); color: var(--teal); }
 .status.attente { background: rgba(251,191,36,0.15); color: var(--warning); }
-
-/* Streamlit widgets */
-[data-testid="stTextInput"] input, [data-testid="stNumberInput"] input,
-[data-baseweb="select"] > div, textarea {
-    background: var(--surface) !important; border: 1px solid var(--border) !important; color: var(--text) !important;
-    border-radius: 10px !important;
-}
-button[kind="primary"] {
-    background: linear-gradient(90deg, var(--teal), #34d399) !important; color: #06201c !important; border: none !important;
-}
 .stTabs [data-baseweb="tab"] { color: var(--muted); }
 .stTabs [aria-selected="true"] { color: var(--teal) !important; }
 </style>
@@ -221,9 +210,15 @@ tab_parent, tab_tuteur, tab_admin = st.tabs(["👨‍👩‍👧 Parent", "📚 
 # ONGLET PARENT
 # ------------------------------------------------------------------
 with tab_parent:
-    actifs = [r for r in st.session_state.repetiteurs if r["statut"] == "actif"]
+    repetiteurs = charger_repetiteurs_actifs()
 
-    st.markdown(f"""
+    def toutes_matieres():
+        return sorted({m for r in repetiteurs for m in r["matieres"]})
+
+    def tous_quartiers():
+        return sorted({z for r in repetiteurs for z in r["zones_couvertes"]})
+
+    st.markdown("""
     <div class="hero">
       <h2>Trouvez le bon répétiteur</h2>
       <p>Filtrez par matière, niveau, quartier et budget. Contactez directement sur WhatsApp.</p>
@@ -232,7 +227,7 @@ with tab_parent:
 
     s1, s2, s3 = st.columns(3)
     with s1:
-        st.markdown(f'<div class="stat"><strong>{len(actifs)}</strong><span>profils visibles</span></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="stat"><strong>{len(repetiteurs)}</strong><span>profils visibles</span></div>', unsafe_allow_html=True)
     with s2:
         st.markdown(f'<div class="stat"><strong>{len(tous_quartiers())}</strong><span>quartiers couverts</span></div>', unsafe_allow_html=True)
     with s3:
@@ -250,8 +245,6 @@ with tab_parent:
         budget_max = st.number_input("Budget max (FCFA/h)", min_value=0, value=5000, step=250)
 
     def correspond(r):
-        if r["statut"] != "actif":
-            return False
         if matiere_filtre != "Toutes" and matiere_filtre not in r["matieres"]:
             return False
         if niveau_filtre != "Tous" and niveau_filtre not in r["niveaux"]:
@@ -262,7 +255,7 @@ with tab_parent:
             return False
         return True
 
-    resultats = [r for r in st.session_state.repetiteurs if correspond(r)]
+    resultats = [r for r in repetiteurs if correspond(r)]
 
     st.write("")
     if not resultats:
@@ -305,7 +298,7 @@ with tab_tuteur:
     """, unsafe_allow_html=True)
 
     if st.session_state.get("profil_ajoute"):
-        st.success("✅ Profil enregistré (démo). En production, il passerait en validation admin puis deviendrait visible.")
+        st.success("✅ Profil enregistré ! Il sera visible après validation par un administrateur.")
         st.session_state.profil_ajoute = False
 
     with st.form("form_tuteur", clear_on_submit=True):
@@ -327,8 +320,7 @@ with tab_tuteur:
             if not nom or not telephone or not quartier or not matiere or not niveau:
                 st.error("Merci de remplir tous les champs obligatoires (*).")
             else:
-                st.session_state.repetiteurs.insert(0, {
-                    "id": st.session_state.next_id,
+                payload = {
                     "nom": nom.strip(),
                     "quartier": quartier.strip(),
                     "zones_couvertes": [quartier.strip()],
@@ -339,42 +331,68 @@ with tab_tuteur:
                     "telephone": "".join(ch for ch in telephone if ch.isdigit()),
                     "presentation": bio.strip() or "Nouveau profil répétiteur.",
                     "statut": "attente",
-                })
-                st.session_state.next_id += 1
-                st.session_state.profil_ajoute = True
-                st.rerun()
+                }
+                if inserer_repetiteur(payload):
+                    st.session_state.profil_ajoute = True
+                    st.rerun()
 
-    st.caption("* Champs obligatoires. En V1 réelle : validation admin + photo/CV optionnels.")
+    st.caption("* Champs obligatoires. Un administrateur doit valider votre profil avant qu'il soit visible.")
 
 # ------------------------------------------------------------------
 # ONGLET ADMIN
 # ------------------------------------------------------------------
 with tab_admin:
-    st.markdown("""
-    <div class="hero">
-      <h2>Validation des profils</h2>
-      <p>Aperçu du panneau admin : activer, suspendre, contrôler la qualité.</p>
-    </div>
-    """, unsafe_allow_html=True)
+    admin_client = get_admin_client()
 
-    hdr = st.columns([2, 2, 2, 1.5, 1.5, 1.5])
-    for col, label in zip(hdr, ["Nom", "Matière", "Quartier", "Tarif", "Statut", "Action"]):
-        col.markdown(f"**{label}**")
-    st.markdown("<hr style='border-color: rgba(94,234,212,0.18); margin: 4px 0 8px;'>", unsafe_allow_html=True)
+    if admin_client is None:
+        st.markdown("""
+        <div class="hero">
+          <h2>Connexion admin</h2>
+          <p>Connectez-vous avec votre compte administrateur Supabase.</p>
+        </div>
+        """, unsafe_allow_html=True)
 
-    for r in st.session_state.repetiteurs:
-        row = st.columns([2, 2, 2, 1.5, 1.5, 1.5])
-        row[0].write(r["nom"])
-        row[1].write(", ".join(r["matieres"]))
-        row[2].write(r["quartier"])
-        row[3].write(f"{r['tarif_horaire']:,} F".replace(",", " "))
-        statut_class = "actif" if r["statut"] == "actif" else "attente"
-        statut_label = "Actif" if r["statut"] == "actif" else "En attente"
-        row[4].markdown(f'<span class="status {statut_class}">{statut_label}</span>', unsafe_allow_html=True)
-        bouton_label = "Suspendre" if r["statut"] == "actif" else "Activer"
-        if row[5].button(bouton_label, key=f"toggle_{r['id']}"):
-            r["statut"] = "attente" if r["statut"] == "actif" else "actif"
-            st.rerun()
+        with st.form("form_admin_login"):
+            email = st.text_input("Email admin")
+            mot_de_passe = st.text_input("Mot de passe", type="password")
+            if st.form_submit_button("Se connecter"):
+                if admin_login(email, mot_de_passe):
+                    st.rerun()
+    else:
+        col_titre, col_logout = st.columns([4, 1])
+        with col_titre:
+            st.markdown("""
+            <div class="hero">
+              <h2>Validation des profils</h2>
+              <p>Activer, suspendre, contrôler la qualité des profils.</p>
+            </div>
+            """, unsafe_allow_html=True)
+        with col_logout:
+            if st.button("Déconnexion"):
+                st.session_state.pop("admin_session", None)
+                st.rerun()
+
+        repetiteurs_admin = charger_repetiteurs_admin(admin_client)
+
+        hdr = st.columns([2, 2, 2, 1.5, 1.5, 1.5])
+        for col, label in zip(hdr, ["Nom", "Matière", "Quartier", "Tarif", "Statut", "Action"]):
+            col.markdown(f"**{label}**")
+        st.markdown("<hr style='border-color: rgba(94,234,212,0.18); margin: 4px 0 8px;'>", unsafe_allow_html=True)
+
+        for r in repetiteurs_admin:
+            row = st.columns([2, 2, 2, 1.5, 1.5, 1.5])
+            row[0].write(r["nom"])
+            row[1].write(", ".join(r["matieres"]))
+            row[2].write(r["quartier"])
+            row[3].write(f"{r['tarif_horaire']:,} F".replace(",", " "))
+            statut_class = "actif" if r["statut"] == "actif" else "attente"
+            statut_label = "Actif" if r["statut"] == "actif" else "En attente"
+            row[4].markdown(f'<span class="status {statut_class}">{statut_label}</span>', unsafe_allow_html=True)
+            bouton_label = "Suspendre" if r["statut"] == "actif" else "Activer"
+            if row[5].button(bouton_label, key=f"toggle_{r['id']}"):
+                nouveau_statut = "attente" if r["statut"] == "actif" else "actif"
+                if toggle_statut_admin(admin_client, r["id"], nouveau_statut):
+                    st.rerun()
 
 st.markdown(
     "<footer style='margin-top:28px;text-align:center;color:#8b9bb4;font-size:0.8rem;'>"
