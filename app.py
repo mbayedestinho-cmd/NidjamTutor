@@ -1,5 +1,6 @@
 import streamlit as st
 import urllib.parse
+import uuid
 from datetime import datetime, timedelta, timezone
 from supabase import create_client, Client
 
@@ -13,6 +14,17 @@ st.set_page_config(page_title="TuteurTD", page_icon="📚", layout="wide")
 #
 # SUPABASE_URL = "https://xxxxxxxx.supabase.co"
 # SUPABASE_ANON_KEY = "eyJ...."   (clé "anon public" du projet)
+#
+# NOUVEAU — à configurer côté Supabase pour les fonctionnalités
+# photo de profil + avis (voir migration.sql fourni à part) :
+#
+# 1) Storage : créer un bucket PUBLIC nommé "photos-repetiteurs"
+#    + une policy INSERT pour le rôle "anon" sur ce bucket.
+# 2) Table "avis" (repetiteur_id uuid, note int, commentaire text,
+#    created_at timestamptz default now()) avec RLS activée :
+#    - policy SELECT publique (lecture libre)
+#    - policy INSERT publique (dépôt libre, modération a posteriori)
+# 3) Colonne "photo_url" (text, nullable) sur la table "repetiteurs".
 
 @st.cache_resource
 def get_client() -> Client:
@@ -22,6 +34,8 @@ def get_client() -> Client:
 supabase = get_client()
 
 TOUS_NIVEAUX = ["Primaire", "Collège", "Lycée", "Terminale"]
+EXPERIENCE_POIDS = {"Débutant": 1, "1-2 ans": 2, "+3 ans": 3}
+BUCKET_PHOTOS = "photos-repetiteurs"
 
 
 def initiales(nom):
@@ -87,6 +101,59 @@ def incrementer_contact(repet_id):
         supabase.rpc("increment_contact", {"p_id": repet_id}).execute()
     except Exception:
         pass
+
+
+def uploader_photo(fichier):
+    """Upload la photo vers Supabase Storage et renvoie son URL publique.
+    Best-effort : si l'upload échoue, on continue sans bloquer l'inscription."""
+    if fichier is None:
+        return None
+    try:
+        ext = fichier.name.split(".")[-1].lower()
+        nom_fichier = f"{uuid.uuid4()}.{ext}"
+        supabase.storage.from_(BUCKET_PHOTOS).upload(
+            nom_fichier,
+            fichier.getvalue(),
+            {"content-type": fichier.type or "image/jpeg"},
+        )
+        return supabase.storage.from_(BUCKET_PHOTOS).get_public_url(nom_fichier)
+    except Exception:
+        st.warning("La photo n'a pas pu être envoyée — le profil sera créé sans photo.")
+        return None
+
+
+def charger_avis_stats():
+    """Retourne {repetiteur_id: (note_moyenne, nb_avis)} pour tous les profils."""
+    try:
+        res = supabase.table("avis").select("repetiteur_id, note").execute()
+        groupes = {}
+        for a in res.data:
+            groupes.setdefault(a["repetiteur_id"], []).append(a["note"])
+        return {rid: (sum(notes) / len(notes), len(notes)) for rid, notes in groupes.items()}
+    except Exception:
+        return {}
+
+
+def ajouter_avis(repet_id, note, commentaire):
+    """Insertion publique d'un avis (RLS : insert et select publics, modération a posteriori)."""
+    try:
+        supabase.table("avis").insert({
+            "repetiteur_id": repet_id,
+            "note": note,
+            "commentaire": commentaire.strip() if commentaire else None,
+        }).execute()
+        return True
+    except Exception:
+        st.error("L'avis n'a pas pu être enregistré.")
+        return False
+
+
+def score_pertinence(r, avis_stats):
+    """Combine expérience, nombre de contacts et avis pour trier par pertinence."""
+    exp = EXPERIENCE_POIDS.get(r.get("experience"), 1)
+    contacts = r.get("nb_contacts", 0) or 0
+    moyenne, nb_avis = avis_stats.get(r["id"], (0, 0))
+    return exp * 3 + contacts * 1 + moyenne * nb_avis * 2
 
 
 def est_recent(created_at_str, jours=7):
@@ -190,8 +257,14 @@ h1, h2, h3, p, span, label, div { color: var(--text); }
     background: linear-gradient(145deg, #2dd4bf, #6366f1);
     display: grid; place-items: center; font-weight: 700; color: #06201c; flex-shrink: 0;
 }
+.avatar-img {
+    width: 48px; height: 48px; border-radius: 50%; object-fit: cover; flex-shrink: 0;
+    border: 1px solid var(--border);
+}
 .card-head h3 { font-size: 1.02rem; margin: 0; }
 .card-head .meta { color: var(--muted); font-size: 0.8rem; }
+.note { font-size: 0.78rem; color: var(--warning); margin-bottom: 6px; }
+.note.muted { color: var(--muted); }
 .badges { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
 .badge {
     background: var(--teal-dim); color: var(--teal); border: 1px solid rgba(45, 212, 191, 0.25);
@@ -264,22 +337,29 @@ with tab_parent:
 
     c1, c2, c3, c4 = st.columns(4)
     with c1:
-        matiere_filtre = st.selectbox("Matière", ["Toutes"] + toutes_matieres())
+        matiere_filtre = st.multiselect("Matière (une ou plusieurs)", toutes_matieres())
     with c2:
         niveau_filtre = st.selectbox("Niveau", ["Tous"] + TOUS_NIVEAUX)
     with c3:
-        quartier_filtre = st.selectbox("Quartier / zone", ["Tous"] + tous_quartiers())
+        quartier_filtre = st.multiselect("Quartier / zone (un ou plusieurs)", tous_quartiers())
     with c4:
         budget_max = st.number_input("Budget max (FCFA/h)", min_value=0, value=5000, step=250)
 
-    tri = st.radio("Trier par", ["Plus récents", "Prix croissant", "Prix décroissant"], horizontal=True)
+    tri = st.radio(
+        "Trier par",
+        ["Pertinence", "Plus récents", "Prix croissant", "Prix décroissant"],
+        horizontal=True,
+    )
+
+    avis_stats = charger_avis_stats()
 
     def correspond(r):
-        if matiere_filtre != "Toutes" and matiere_filtre not in r["matieres"]:
+        # Multiselect vide = pas de filtre sur ce critère
+        if matiere_filtre and not any(m in r["matieres"] for m in matiere_filtre):
             return False
         if niveau_filtre != "Tous" and niveau_filtre not in r["niveaux"]:
             return False
-        if quartier_filtre != "Tous" and quartier_filtre not in r["zones_couvertes"]:
+        if quartier_filtre and not any(z in r["zones_couvertes"] for z in quartier_filtre):
             return False
         if r["tarif_horaire"] > budget_max:
             return False
@@ -294,18 +374,32 @@ with tab_parent:
 
     resultats = [r for r in repetiteurs if correspond(r)]
 
-    if tri == "Prix croissant":
+    if tri == "Pertinence":
+        resultats.sort(key=lambda r: score_pertinence(r, avis_stats), reverse=True)
+    elif tri == "Prix croissant":
         resultats.sort(key=lambda r: r["tarif_horaire"])
     elif tri == "Prix décroissant":
         resultats.sort(key=lambda r: r["tarif_horaire"], reverse=True)
     # "Plus récents" : déjà l'ordre renvoyé par charger_repetiteurs_actifs (created_at desc)
 
+    # Pagination : on réinitialise le nombre affiché si les filtres/tri changent
+    signature_filtres = (
+        tuple(sorted(matiere_filtre)), niveau_filtre, tuple(sorted(quartier_filtre)),
+        budget_max, tri, search_query,
+    )
+    if st.session_state.get("_signature_filtres") != signature_filtres:
+        st.session_state._signature_filtres = signature_filtres
+        st.session_state.nb_affiches = 9
+    if "nb_affiches" not in st.session_state:
+        st.session_state.nb_affiches = 9
+
     st.write("")
     if not resultats:
         st.markdown('<div class="empty">Aucun profil ne correspond à vos filtres.</div>', unsafe_allow_html=True)
     else:
+        resultats_page = resultats[: st.session_state.nb_affiches]
         cols = st.columns(3)
-        for i, r in enumerate(resultats):
+        for i, r in enumerate(resultats_page):
             with cols[i % 3]:
                 badges = "".join(f'<span class="badge">{m}</span>' for m in r["matieres"])
                 badges += "".join(f'<span class="badge muted">{n}</span>' for n in r["niveaux"])
@@ -314,24 +408,60 @@ with tab_parent:
                     f"Bonjour {r['nom']}, je vous contacte via TuteurTD pour des cours particuliers."
                 )
                 lien_whatsapp = f"https://wa.me/{r['telephone']}?text={message}"
+
+                if r.get("photo_url"):
+                    avatar_html = f'<img src="{r["photo_url"]}" class="avatar-img" alt="{r["nom"]}">'
+                else:
+                    avatar_html = f'<div class="avatar">{initiales(r["nom"])}</div>'
+
+                moyenne, nb_avis = avis_stats.get(r["id"], (0, 0))
+                if nb_avis > 0:
+                    note_html = f'<div class="note">⭐ {moyenne:.1f}/5 · {nb_avis} avis</div>'
+                else:
+                    note_html = '<div class="note muted">Pas encore d\'avis</div>'
+
                 st.markdown(f"""
                 <div class="card">
                   <div class="card-head">
-                    <div class="avatar">{initiales(r['nom'])}</div>
+                    {avatar_html}
                     <div>
                       <h3>{r['nom']}</h3>
                       <div class="meta">{r['quartier']} · {r['experience']}</div>
                     </div>
                   </div>
+                  {note_html}
                   <div class="badges">{nouveau_html}{badges}</div>
                   <p class="desc">{r['presentation']}</p>
                   <div class="price">{r['tarif_horaire']:,} <span>FCFA/h</span></div>
                   <a class="btn-wa" href="{lien_whatsapp}" target="_blank" rel="noopener">💬 Contacter sur WhatsApp</a>
                 </div>
                 """.replace(",", " "), unsafe_allow_html=True)
+
                 if st.button("↳ J'ai contacté ce profil", key=f"contact_{r['id']}", help="Clique ici après avoir ouvert WhatsApp — ça aide l'admin à voir les profils qui intéressent le plus"):
                     incrementer_contact(r["id"])
                     st.toast("Merci ! Bonne discussion 👋")
+
+                avis_donnes = st.session_state.setdefault("avis_donnes", set())
+                if r["id"] not in avis_donnes:
+                    with st.expander("⭐ Laisser un avis"):
+                        with st.form(f"form_avis_{r['id']}", clear_on_submit=True):
+                            note_choisie = st.slider("Note", 1, 5, 5, key=f"note_{r['id']}")
+                            commentaire = st.text_area("Commentaire (optionnel)", key=f"comm_{r['id']}")
+                            if st.form_submit_button("Envoyer mon avis"):
+                                if ajouter_avis(r["id"], note_choisie, commentaire):
+                                    avis_donnes.add(r["id"])
+                                    st.toast("Merci pour votre avis 🙏")
+                                    st.rerun()
+                else:
+                    st.caption("✅ Avis envoyé — merci !")
+
+        if len(resultats) > len(resultats_page):
+            st.write("")
+            _, col_plus, _ = st.columns([2, 1, 2])
+            with col_plus:
+                if st.button(f"Charger plus de profils ({len(resultats) - len(resultats_page)} restants)"):
+                    st.session_state.nb_affiches += 9
+                    st.rerun()
 
 # ------------------------------------------------------------------
 # ONGLET RÉPÉTITEUR (inscription)
@@ -361,18 +491,21 @@ with tab_tuteur:
             experience = st.selectbox("Expérience", ["Débutant", "1-2 ans", "+3 ans"])
             dispo = st.text_input("Disponibilités", placeholder="Ex: Soirs + week-end")
         bio = st.text_area("Présentation courte", placeholder="Parlez de votre parcours, méthode, résultats…")
+        photo = st.file_uploader("Photo de profil (optionnel)", type=["jpg", "jpeg", "png"])
 
         submitted = st.form_submit_button("Publier mon profil")
         if submitted:
             if not nom or not telephone or not quartier or not matiere or not niveau:
                 st.error("Merci de remplir tous les champs obligatoires (*).")
             else:
+                photo_url = uploader_photo(photo)
                 payload = {
                     "nom": nom.strip(),
                     "quartier": quartier.strip(),
                     "zones_couvertes": [quartier.strip()],
                     "matieres": [matiere.strip()],
                     "niveaux": [niveau],
+                    "photo_url": photo_url,
                     "experience": experience,
                     "tarif_horaire": int(tarif),
                     "telephone": "".join(ch for ch in telephone if ch.isdigit()),
