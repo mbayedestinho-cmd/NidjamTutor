@@ -1,5 +1,6 @@
 import streamlit as st
 import urllib.parse
+from datetime import datetime, timedelta, timezone
 from supabase import create_client, Client
 
 st.set_page_config(page_title="TuteurTD", page_icon="📚", layout="wide")
@@ -74,6 +75,26 @@ def toggle_statut_admin(client_admin, repet_id, nouveau_statut):
         return True
     except Exception as e:
         st.error("La mise à jour a échoué (droits admin refusés ?).")
+        return False
+
+
+def incrementer_contact(repet_id):
+    """Incrémente le compteur de clics WhatsApp via une fonction RPC
+    Postgres (SECURITY DEFINER). Un update direct échouerait : anon
+    n'a pas de policy UPDATE sur la table. Best-effort : un échec ici
+    ne doit jamais bloquer le parent qui veut juste contacter."""
+    try:
+        supabase.rpc("increment_contact", {"p_id": repet_id}).execute()
+    except Exception:
+        pass
+
+
+def est_recent(created_at_str, jours=7):
+    """True si le profil a été créé il y a moins de `jours` jours."""
+    try:
+        created = datetime.fromisoformat(created_at_str.replace("Z", "+00:00"))
+        return datetime.now(timezone.utc) - created < timedelta(days=jours)
+    except Exception:
         return False
 
 
@@ -177,6 +198,7 @@ h1, h2, h3, p, span, label, div { color: var(--text); }
     font-size: 0.72rem; font-weight: 600; padding: 3px 8px; border-radius: 999px;
 }
 .badge.muted { background: rgba(139, 155, 180, 0.12); color: var(--muted); border-color: rgba(139, 155, 180, 0.2); }
+.badge.nouveau { background: rgba(251, 191, 36, 0.15); color: var(--warning); border-color: rgba(251, 191, 36, 0.3); }
 .card p.desc { color: var(--muted); font-size: 0.86rem; }
 .price { font-weight: 700; color: var(--text); font-size: 0.95rem; }
 .price span { color: var(--muted); font-weight: 500; font-size: 0.78rem; }
@@ -238,6 +260,8 @@ with tab_parent:
         st.markdown(f'<div class="stat"><strong>{len(toutes_matieres())}</strong><span>matières</span></div>', unsafe_allow_html=True)
 
     st.write("")
+    search_query = st.text_input("🔍 Rechercher un nom ou un mot-clé", placeholder="Ex: Mathématiques, Amina, expérience...")
+
     c1, c2, c3, c4 = st.columns(4)
     with c1:
         matiere_filtre = st.selectbox("Matière", ["Toutes"] + toutes_matieres())
@@ -248,6 +272,8 @@ with tab_parent:
     with c4:
         budget_max = st.number_input("Budget max (FCFA/h)", min_value=0, value=5000, step=250)
 
+    tri = st.radio("Trier par", ["Plus récents", "Prix croissant", "Prix décroissant"], horizontal=True)
+
     def correspond(r):
         if matiere_filtre != "Toutes" and matiere_filtre not in r["matieres"]:
             return False
@@ -257,9 +283,22 @@ with tab_parent:
             return False
         if r["tarif_horaire"] > budget_max:
             return False
+        if search_query:
+            q = search_query.strip().lower()
+            texte = " ".join([
+                r["nom"], r["presentation"], " ".join(r["matieres"]), r["quartier"]
+            ]).lower()
+            if q not in texte:
+                return False
         return True
 
     resultats = [r for r in repetiteurs if correspond(r)]
+
+    if tri == "Prix croissant":
+        resultats.sort(key=lambda r: r["tarif_horaire"])
+    elif tri == "Prix décroissant":
+        resultats.sort(key=lambda r: r["tarif_horaire"], reverse=True)
+    # "Plus récents" : déjà l'ordre renvoyé par charger_repetiteurs_actifs (created_at desc)
 
     st.write("")
     if not resultats:
@@ -270,6 +309,7 @@ with tab_parent:
             with cols[i % 3]:
                 badges = "".join(f'<span class="badge">{m}</span>' for m in r["matieres"])
                 badges += "".join(f'<span class="badge muted">{n}</span>' for n in r["niveaux"])
+                nouveau_html = '<span class="badge nouveau">🆕 Nouveau</span>' if est_recent(r.get("created_at", "")) else ""
                 message = urllib.parse.quote(
                     f"Bonjour {r['nom']}, je vous contacte via TuteurTD pour des cours particuliers."
                 )
@@ -283,12 +323,15 @@ with tab_parent:
                       <div class="meta">{r['quartier']} · {r['experience']}</div>
                     </div>
                   </div>
-                  <div class="badges">{badges}</div>
+                  <div class="badges">{nouveau_html}{badges}</div>
                   <p class="desc">{r['presentation']}</p>
                   <div class="price">{r['tarif_horaire']:,} <span>FCFA/h</span></div>
                   <a class="btn-wa" href="{lien_whatsapp}" target="_blank" rel="noopener">💬 Contacter sur WhatsApp</a>
                 </div>
                 """.replace(",", " "), unsafe_allow_html=True)
+                if st.button("↳ J'ai contacté ce profil", key=f"contact_{r['id']}", help="Clique ici après avoir ouvert WhatsApp — ça aide l'admin à voir les profils qui intéressent le plus"):
+                    incrementer_contact(r["id"])
+                    st.toast("Merci ! Bonne discussion 👋")
 
 # ------------------------------------------------------------------
 # ONGLET RÉPÉTITEUR (inscription)
@@ -378,22 +421,23 @@ with tab_admin:
 
         repetiteurs_admin = charger_repetiteurs_admin(admin_client)
 
-        hdr = st.columns([2, 2, 2, 1.5, 1.5, 1.5])
-        for col, label in zip(hdr, ["Nom", "Matière", "Quartier", "Tarif", "Statut", "Action"]):
+        hdr = st.columns([2, 1.8, 1.8, 1.2, 1, 1.2, 1.5])
+        for col, label in zip(hdr, ["Nom", "Matière", "Quartier", "Tarif", "Contacts", "Statut", "Action"]):
             col.markdown(f"**{label}**")
         st.markdown("<hr style='border-color: rgba(94,234,212,0.18); margin: 4px 0 8px;'>", unsafe_allow_html=True)
 
         for r in repetiteurs_admin:
-            row = st.columns([2, 2, 2, 1.5, 1.5, 1.5])
+            row = st.columns([2, 1.8, 1.8, 1.2, 1, 1.2, 1.5])
             row[0].write(r["nom"])
             row[1].write(", ".join(r["matieres"]))
             row[2].write(r["quartier"])
             row[3].write(f"{r['tarif_horaire']:,} F".replace(",", " "))
+            row[4].write(str(r.get("nb_contacts", 0)))
             statut_class = "actif" if r["statut"] == "actif" else "attente"
             statut_label = "Actif" if r["statut"] == "actif" else "En attente"
-            row[4].markdown(f'<span class="status {statut_class}">{statut_label}</span>', unsafe_allow_html=True)
+            row[5].markdown(f'<span class="status {statut_class}">{statut_label}</span>', unsafe_allow_html=True)
             bouton_label = "Suspendre" if r["statut"] == "actif" else "Activer"
-            if row[5].button(bouton_label, key=f"toggle_{r['id']}"):
+            if row[6].button(bouton_label, key=f"toggle_{r['id']}"):
                 nouveau_statut = "attente" if r["statut"] == "actif" else "actif"
                 if toggle_statut_admin(admin_client, r["id"], nouveau_statut):
                     st.rerun()
