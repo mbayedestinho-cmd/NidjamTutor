@@ -135,13 +135,22 @@ def charger_avis_stats():
 
 
 def ajouter_avis(repet_id, note, commentaire):
-    """Insertion publique d'un avis (RLS : insert et select publics, modération a posteriori)."""
+    """Insertion publique d'un avis.
+
+    IMPORTANT : on utilise returning="minimal" pour la même raison que
+    pour inserer_repetiteur() — sans ça, PostgREST tente de relire la
+    ligne insérée après l'INSERT pour la renvoyer au client, et cette
+    relecture repasse par la policy SELECT. Si cette policy SELECT
+    change un jour (modération, visibilité restreinte, etc.) ou si la
+    migration n'a pas encore été appliquée côté Supabase, l'insertion
+    réussit mais échoue quand même à cause du RETURNING implicite.
+    """
     try:
         supabase.table("avis").insert({
             "repetiteur_id": repet_id,
             "note": note,
             "commentaire": commentaire.strip() if commentaire else None,
-        }).execute()
+        }, returning="minimal").execute()
         return True
     except Exception:
         st.error("L'avis n'a pas pu être enregistré.")
