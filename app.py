@@ -152,8 +152,8 @@ def ajouter_avis(repet_id, note, commentaire):
             "commentaire": commentaire.strip() if commentaire else None,
         }, returning="minimal").execute()
         return True
-    except Exception:
-        st.error("L'avis n'a pas pu être enregistré.")
+    except Exception as e:
+        st.error(f"L'avis n'a pas pu être enregistré. Détail technique : {e}")
         return False
 
 
