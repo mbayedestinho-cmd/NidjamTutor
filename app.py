@@ -11,7 +11,7 @@ st.set_page_config(page_title="TuteurTD", page_icon="📚", layout="wide")
 # "Secrets" de Streamlit Community Cloud :
 #
 # SUPABASE_URL = "https://xxxxxxxx.supabase.co"
-# SUPABASE_ANON_KEY = "eyJ...." (clé "anon public" du projet)
+# SUPABASE_ANON_KEY = "eyJ...."   (clé "anon public" du projet)
 
 @st.cache_resource
 def get_client() -> Client:
@@ -38,19 +38,23 @@ def charger_repetiteurs_actifs():
         return res.data
     except Exception as e:
         st.error("Impossible de charger les profils pour le moment. Réessayez dans un instant.")
-        st.exception(e) # TEMPORAIRE — à retirer une fois le bug résolu
         return []
 
 
 def inserer_repetiteur(payload):
-    """Insertion publique : la RLS n'autorise que statut='attente'."""
-    st.write("DEBUG payload envoyé à Supabase :", payload) # TEMPORAIRE — à retirer une fois le bug résolu
+    """Insertion publique : la RLS n'autorise que statut='attente'.
+
+    IMPORTANT : on utilise returning="minimal" car la policy SELECT
+    publique n'autorise que statut='actif'. Sans ça, PostgREST tente
+    de renvoyer la ligne insérée (statut='attente') après l'INSERT,
+    ce qui échoue la policy SELECT et déclenche une fausse erreur RLS
+    même quand l'insertion elle-même est valide.
+    """
     try:
-        supabase.table("repetiteurs").insert(payload).execute()
+        supabase.table("repetiteurs").insert(payload, returning="minimal").execute()
         return True
     except Exception as e:
         st.error("L'enregistrement a échoué. Vérifiez vos informations et réessayez.")
-        st.exception(e) # TEMPORAIRE — à retirer une fois le bug résolu
         return False
 
 
@@ -61,7 +65,6 @@ def charger_repetiteurs_admin(client_admin):
         return res.data
     except Exception as e:
         st.error("Impossible de charger la liste admin.")
-        st.exception(e) # TEMPORAIRE — à retirer une fois le bug résolu
         return []
 
 
@@ -71,7 +74,6 @@ def toggle_statut_admin(client_admin, repet_id, nouveau_statut):
         return True
     except Exception as e:
         st.error("La mise à jour a échoué (droits admin refusés ?).")
-        st.exception(e) # TEMPORAIRE — à retirer une fois le bug résolu
         return False
 
 
