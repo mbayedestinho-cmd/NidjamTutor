@@ -36,11 +36,26 @@ supabase = get_client()
 TOUS_NIVEAUX = ["Primaire", "Collège", "Lycée", "Terminale"]
 EXPERIENCE_POIDS = {"Débutant": 1, "1-2 ans": 2, "+3 ans": 3}
 BUCKET_PHOTOS = "photos-repetiteurs"
+BUCKET_JUSTIFICATIFS = "justificatifs-repetiteurs"
 
 
 def initiales(nom):
     parts = nom.split()
     return "".join(p[0] for p in parts[:2]).upper() if parts else "TR"
+
+
+def parser_liste(texte):
+    """Convertit 'Maths, Physique,  Maths' en ['Maths', 'Physique'] :
+    strip, ignore les vides, déduplique en gardant l'ordre."""
+    if not texte:
+        return []
+    vus, resultat = set(), []
+    for item in texte.split(","):
+        item = item.strip()
+        if item and item not in vus:
+            vus.add(item)
+            resultat.append(item)
+    return resultat
 
 
 # ------------------------------------------------------------------
@@ -120,6 +135,61 @@ def uploader_photo(fichier):
     except Exception:
         st.warning("La photo n'a pas pu être envoyée — le profil sera créé sans photo.")
         return None
+
+
+def uploader_justificatifs(fichiers, edit_token):
+    """Upload les justificatifs (diplôme, CNI) vers un bucket PRIVÉ.
+
+    Contrairement aux photos, ces documents ne sont jamais publics : le
+    bucket n'a pas de policy SELECT pour 'anon'. On stocke uniquement le
+    chemin de stockage (pas d'URL publique) ; seul un admin authentifié
+    pourra générer une URL signée pour les consulter (Lot 2).
+    Best-effort : un échec sur un fichier ne bloque pas les autres.
+    """
+    chemins = []
+    for fichier in fichiers or []:
+        try:
+            ext = fichier.name.split(".")[-1].lower()
+            chemin = f"{edit_token}/{uuid.uuid4()}.{ext}"
+            supabase.storage.from_(BUCKET_JUSTIFICATIFS).upload(
+                chemin,
+                fichier.getvalue(),
+                {"content-type": fichier.type or "application/octet-stream"},
+            )
+            chemins.append(chemin)
+        except Exception:
+            st.warning(f"Le fichier « {fichier.name} » n'a pas pu être envoyé.")
+    return chemins
+
+
+def get_repetiteur_par_token(token):
+    """Récupère un profil (quel que soit son statut) via son edit_token,
+    en passant par une RPC SECURITY DEFINER — la RLS publique normale
+    n'autorise que statut='actif', ce qui bloquerait un profil en attente."""
+    try:
+        res = supabase.rpc("get_repetiteur_by_token", {"p_token": token}).execute()
+        return res.data[0] if res.data else None
+    except Exception:
+        return None
+
+
+def maj_repetiteur_par_token(token, updates):
+    """Met à jour un profil via son edit_token (RPC SECURITY DEFINER).
+    anon n'a pas de policy UPDATE directe sur 'repetiteurs' : seule cette
+    fonction, qui vérifie le token côté serveur, peut modifier la ligne."""
+    try:
+        supabase.rpc("update_repetiteur_by_token", {"p_token": token, "p_updates": updates}).execute()
+        return True
+    except Exception:
+        st.error("La mise à jour a échoué. Vérifiez votre code personnel.")
+        return False
+
+
+def lien_edition(token):
+    """Construit un lien direct vers l'onglet édition si APP_URL est
+    configurée dans les secrets ; sinon retourne None (fallback: code brut)."""
+    base = st.secrets.get("APP_URL", "").rstrip("/")
+    return f"{base}/?edit={token}" if base else None
 
 
 def charger_avis_stats():
@@ -312,7 +382,9 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-tab_parent, tab_tuteur, tab_admin = st.tabs(["👨‍👩‍👧 Parent", "👩‍🏫 Répétiteur", "🛠️ Admin"])
+tab_parent, tab_tuteur, tab_edition, tab_admin = st.tabs(
+    ["👨‍👩‍👧 Parent", "👩‍🏫 Répétiteur", "✏️ Modifier mon profil", "🛠️ Admin"]
+)
 
 # ------------------------------------------------------------------
 # ONGLET PARENT (recherche)
@@ -484,7 +556,16 @@ with tab_tuteur:
     """, unsafe_allow_html=True)
 
     if st.session_state.get("profil_ajoute"):
+        token_genere = st.session_state.get("dernier_edit_token", "")
+        lien = lien_edition(token_genere)
         st.success("✅ Profil enregistré ! Il sera visible après validation par un administrateur.")
+        st.warning(
+            "⚠️ **Conservez ce code personnel** — c'est le seul moyen de modifier "
+            "votre profil plus tard (aucun compte n'est créé)."
+        )
+        st.code(lien or token_genere, language=None)
+        if not lien:
+            st.caption("Collez ce code dans l'onglet « ✏️ Modifier mon profil » pour l'utiliser.")
         st.session_state.profil_ajoute = False
 
     with st.form("form_tuteur", clear_on_submit=True):
@@ -492,7 +573,14 @@ with tab_tuteur:
         with fc1:
             nom = st.text_input("Nom complet *", placeholder="Ex: Amina Mahamat")
             quartier = st.text_input("Quartier principal *", placeholder="Ex: Chagoua")
-            matiere = st.text_input("Matière principale *", placeholder="Ex: Mathématiques")
+            autres_quartiers_input = st.text_input(
+                "Autres quartiers couverts (optionnel, séparés par virgule)",
+                placeholder="Ex: Diguel, Walia",
+            )
+            matieres_input = st.text_input(
+                "Matières enseignées * (séparées par virgule)",
+                placeholder="Ex: Mathématiques, Physique",
+            )
             niveau = st.selectbox("Niveau visé *", [""] + TOUS_NIVEAUX + ["Université"])
         with fc2:
             telephone = st.text_input("Téléphone WhatsApp *", placeholder="Ex: 23566001234")
@@ -501,18 +589,26 @@ with tab_tuteur:
             dispo = st.text_input("Disponibilités", placeholder="Ex: Soirs + week-end")
         bio = st.text_area("Présentation courte", placeholder="Parlez de votre parcours, méthode, résultats…")
         photo = st.file_uploader("Photo de profil (optionnel)", type=["jpg", "jpeg", "png"])
+        justificatifs_files = st.file_uploader(
+            "Justificatifs — diplôme, CNI (optionnel, accélère la validation)",
+            type=["jpg", "jpeg", "png", "pdf"],
+            accept_multiple_files=True,
+        )
 
         submitted = st.form_submit_button("Publier mon profil")
         if submitted:
-            if not nom or not telephone or not quartier or not matiere or not niveau:
+            matieres_liste = parser_liste(matieres_input)
+            if not nom or not telephone or not quartier or not matieres_liste or not niveau:
                 st.error("Merci de remplir tous les champs obligatoires (*).")
             else:
+                edit_token = str(uuid.uuid4())
                 photo_url = uploader_photo(photo)
+                chemins_justificatifs = uploader_justificatifs(justificatifs_files, edit_token)
                 payload = {
                     "nom": nom.strip(),
                     "quartier": quartier.strip(),
-                    "zones_couvertes": [quartier.strip()],
-                    "matieres": [matiere.strip()],
+                    "zones_couvertes": [quartier.strip()] + parser_liste(autres_quartiers_input),
+                    "matieres": matieres_liste,
                     "niveaux": [niveau],
                     "photo_url": photo_url,
                     "experience": experience,
@@ -520,12 +616,93 @@ with tab_tuteur:
                     "telephone": "".join(ch for ch in telephone if ch.isdigit()),
                     "presentation": bio.strip() or "Nouveau profil répétiteur.",
                     "statut": "attente",
+                    "edit_token": edit_token,
+                    "justificatifs": chemins_justificatifs,
                 }
                 if inserer_repetiteur(payload):
                     st.session_state.profil_ajoute = True
+                    st.session_state.dernier_edit_token = edit_token
                     st.rerun()
 
     st.caption("* Champs obligatoires. Un administrateur doit valider votre profil avant qu'il soit visible.")
+
+# ------------------------------------------------------------------
+# ONGLET ÉDITION (modification via code personnel / edit_token)
+# ------------------------------------------------------------------
+with tab_edition:
+    st.markdown("""
+    <div class="hero">
+      <h2>Modifier mon profil</h2>
+      <p>Collez votre code personnel reçu à l'inscription pour mettre à jour vos informations.</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    token_url = st.query_params.get("edit", "")
+    token_saisi = st.text_input("Code personnel *", value=token_url, placeholder="Ex: 8f3c1a2b-4d5e-...")
+
+    if token_saisi:
+        profil = get_repetiteur_par_token(token_saisi.strip())
+        if not profil:
+            st.error("Code invalide. Vérifiez qu'il est correctement copié.")
+        else:
+            st.success(f"Profil trouvé : **{profil['nom']}**")
+            with st.form("form_edition"):
+                ec1, ec2 = st.columns(2)
+                with ec1:
+                    e_nom = st.text_input("Nom complet *", value=profil["nom"])
+                    e_quartier = st.text_input("Quartier principal *", value=profil["quartier"])
+                    e_autres_quartiers = st.text_input(
+                        "Autres quartiers couverts (séparés par virgule)",
+                        value=", ".join(z for z in profil["zones_couvertes"] if z != profil["quartier"]),
+                    )
+                    e_matieres = st.text_input(
+                        "Matières * (séparées par virgule)", value=", ".join(profil["matieres"])
+                    )
+                with ec2:
+                    e_telephone = st.text_input("Téléphone WhatsApp *", value=profil["telephone"])
+                    e_tarif = st.number_input(
+                        "Tarif indicatif (FCFA/heure) *",
+                        min_value=500, step=250, value=int(profil["tarif_horaire"]),
+                    )
+                    experiences = ["Débutant", "1-2 ans", "+3 ans"]
+                    e_experience = st.selectbox(
+                        "Expérience", experiences,
+                        index=experiences.index(profil["experience"]) if profil.get("experience") in experiences else 0,
+                    )
+                e_bio = st.text_area("Présentation courte", value=profil.get("presentation", ""))
+                e_photo = st.file_uploader("Nouvelle photo (remplace l'actuelle)", type=["jpg", "jpeg", "png"])
+                e_justificatifs = st.file_uploader(
+                    "Ajouter des justificatifs (diplôme, CNI)",
+                    type=["jpg", "jpeg", "png", "pdf"],
+                    accept_multiple_files=True,
+                )
+                st.caption(f"{len(profil.get('justificatifs') or [])} justificatif(s) déjà envoyé(s).")
+
+                if st.form_submit_button("Enregistrer les modifications"):
+                    matieres_liste = parser_liste(e_matieres)
+                    if not e_nom or not e_telephone or not e_quartier or not matieres_liste:
+                        st.error("Merci de remplir tous les champs obligatoires (*).")
+                    else:
+                        updates = {
+                            "nom": e_nom.strip(),
+                            "quartier": e_quartier.strip(),
+                            "zones_couvertes": [e_quartier.strip()] + parser_liste(e_autres_quartiers),
+                            "matieres": matieres_liste,
+                            "experience": e_experience,
+                            "tarif_horaire": int(e_tarif),
+                            "telephone": "".join(ch for ch in e_telephone if ch.isdigit()),
+                            "presentation": e_bio.strip(),
+                        }
+                        if e_photo is not None:
+                            nouvelle_photo = uploader_photo(e_photo)
+                            if nouvelle_photo:
+                                updates["photo_url"] = nouvelle_photo
+                        if e_justificatifs:
+                            nouveaux_chemins = uploader_justificatifs(e_justificatifs, token_saisi.strip())
+                            updates["justificatifs"] = (profil.get("justificatifs") or []) + nouveaux_chemins
+                        if maj_repetiteur_par_token(token_saisi.strip(), updates):
+                            st.success("✅ Profil mis à jour.")
+                            st.rerun()
 
 # ------------------------------------------------------------------
 # ONGLET ADMIN
