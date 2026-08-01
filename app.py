@@ -208,6 +208,19 @@ def toggle_statut_admin(client_admin, repet_id, nouveau_statut):
         return False
 
 
+def supprimer_repetiteur_admin(client_admin, repet_id):
+    """Suppression définitive et irréversible d'un profil. Ne supprime pas
+    les fichiers déjà uploadés dans les buckets (photo/justificatifs) —
+    ils restent orphelins, ce qui est sans risque de sécurité (juste de
+    l'espace de stockage non critique)."""
+    try:
+        client_admin.table("repetiteurs").delete().eq("id", repet_id).execute()
+        return True
+    except Exception:
+        st.error("La suppression a échoué (droits admin refusés ?).")
+        return False
+
+
 def obtenir_url_signee_justificatif(client_admin, chemin, expiration_secondes=300):
     """Génère une URL signée temporaire (5 min par défaut) pour un fichier du
     bucket privé justificatifs-repetiteurs. Ne jamais rendre ce bucket public :
@@ -1083,6 +1096,29 @@ with tab_admin:
             if row[6].button(bouton_label, key=f"toggle_{r['id']}"):
                 nouveau = "attente" if statut == "actif" else "actif"
                 if toggle_statut_admin(admin_client, r["id"], nouveau):
+                    st.rerun()
+
+            cle_confirmation = f"confirmer_suppr_{r['id']}"
+            if st.session_state.get(cle_confirmation):
+                st.warning(
+                    f"⚠️ Supprimer définitivement **{esc(r.get('nom'))}** ? "
+                    "Cette action est irréversible."
+                )
+                c_confirme, c_annule = st.columns(2)
+                if c_confirme.button(
+                    "🗑️ Confirmer la suppression",
+                    key=f"confirm_del_{r['id']}",
+                    type="primary",
+                ):
+                    if supprimer_repetiteur_admin(admin_client, r["id"]):
+                        st.session_state.pop(cle_confirmation, None)
+                        st.rerun()
+                if c_annule.button("Annuler", key=f"cancel_del_{r['id']}"):
+                    st.session_state.pop(cle_confirmation, None)
+                    st.rerun()
+            else:
+                if st.button("🗑️ Supprimer ce profil", key=f"del_{r['id']}"):
+                    st.session_state[cle_confirmation] = True
                     st.rerun()
 
             justificatifs_r = r.get("justificatifs") or []
