@@ -215,12 +215,11 @@ def incrementer_contact(repet_id):
         pass
 
 
-def uploader_photo(fichier):
-    """Upload photo de profil (bucket public).
-    Retourne (url_ou_None, message_erreur_ou_None) — n'affiche plus l'erreur
-    directement, car un st.warning() ici serait effacé par le st.rerun()
-    qui suit l'enregistrement du profil. L'appelant conserve le message
-    dans st.session_state pour qu'il survive au rerun.
+def uploader_photo(fichier, edit_token):
+    """Upload photo de profil (bucket public), scopée par edit_token —
+    même principe que uploader_justificatifs : le chemin doit commencer
+    par un edit_token existant pour satisfaire la policy Storage.
+    Retourne (url_ou_None, message_erreur_ou_None).
     """
     if fichier is None:
         return None, None
@@ -233,7 +232,8 @@ def uploader_photo(fichier):
         ext = fichier.name.split(".")[-1].lower()
         if ext not in ("jpg", "jpeg", "png"):
             ext = "jpg"
-        nom_fichier = f"{uuid.uuid4()}.{ext}"
+        token_safe = "".join(ch for ch in str(edit_token) if ch.isalnum() or ch in "-_")
+        nom_fichier = f"{token_safe}/{uuid.uuid4()}.{ext}"
         supabase.storage.from_(BUCKET_PHOTOS).upload(
             nom_fichier,
             fichier.getvalue(),
@@ -809,9 +809,6 @@ with tab_tuteur:
                 st.error("Merci de remplir tous les champs obligatoires (*).")
             else:
                 avertissements_upload = []
-                photo_url, err_photo = uploader_photo(photo)
-                if err_photo:
-                    avertissements_upload.append(err_photo)
                 payload = {
                     "nom": nom.strip(),
                     "quartier": quartier.strip(),
@@ -819,7 +816,7 @@ with tab_tuteur:
                     + parser_liste(autres_quartiers_input),
                     "matieres": matieres_liste,
                     "niveaux": list(niveaux_input),
-                    "photo_url": photo_url,
+                    "photo_url": None,
                     "experience": experience,
                     "tarif_horaire": int(tarif),
                     "telephone": normaliser_tel(telephone),
@@ -830,15 +827,22 @@ with tab_tuteur:
 
                 token_genere = inserer_repetiteur(payload)
                 if token_genere:
+                    updates_post_insert = {}
+                    if photo is not None:
+                        photo_url, err_photo = uploader_photo(photo, token_genere)
+                        if err_photo:
+                            avertissements_upload.append(err_photo)
+                        if photo_url:
+                            updates_post_insert["photo_url"] = photo_url
                     if justificatifs_files:
                         chemins, err_justificatifs = uploader_justificatifs(
                             justificatifs_files, token_genere
                         )
                         avertissements_upload.extend(err_justificatifs)
                         if chemins:
-                            maj_repetiteur_par_token(
-                                token_genere, {"justificatifs": chemins}
-                            )
+                            updates_post_insert["justificatifs"] = chemins
+                    if updates_post_insert:
+                        maj_repetiteur_par_token(token_genere, updates_post_insert)
                     st.session_state.dernier_avertissements_upload = avertissements_upload
                     st.session_state.profil_ajoute = True
                     st.session_state.dernier_edit_token = token_genere
@@ -974,7 +978,7 @@ with tab_edition:
                         }
                         avertissements_upload = []
                         if e_photo is not None:
-                            nouvelle_photo, err_photo = uploader_photo(e_photo)
+                            nouvelle_photo, err_photo = uploader_photo(e_photo, token_saisi.strip())
                             if err_photo:
                                 avertissements_upload.append(err_photo)
                             if nouvelle_photo:
