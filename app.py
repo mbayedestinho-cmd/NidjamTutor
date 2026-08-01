@@ -208,6 +208,22 @@ def toggle_statut_admin(client_admin, repet_id, nouveau_statut):
         return False
 
 
+def obtenir_url_signee_justificatif(client_admin, chemin, expiration_secondes=300):
+    """Génère une URL signée temporaire (5 min par défaut) pour un fichier du
+    bucket privé justificatifs-repetiteurs. Ne jamais rendre ce bucket public :
+    la signature expire, donc un lien partagé par erreur devient inutilisable
+    rapidement. Retourne None si la génération échoue (droits, fichier absent)."""
+    try:
+        res = client_admin.storage.from_(BUCKET_JUSTIFICATIFS).create_signed_url(
+            chemin, expiration_secondes
+        )
+        if isinstance(res, dict):
+            return res.get("signedURL") or res.get("signedUrl") or res.get("signed_url")
+        return None
+    except Exception:
+        return None
+
+
 def incrementer_contact(repet_id):
     try:
         supabase.rpc("increment_contact", {"p_id": repet_id}).execute()
@@ -1068,6 +1084,20 @@ with tab_admin:
                 nouveau = "attente" if statut == "actif" else "actif"
                 if toggle_statut_admin(admin_client, r["id"], nouveau):
                     st.rerun()
+
+            justificatifs_r = r.get("justificatifs") or []
+            if justificatifs_r:
+                with st.expander(f"📎 {len(justificatifs_r)} justificatif(s) — {esc(r.get('nom'))}"):
+                    for chemin in justificatifs_r:
+                        url_signee = obtenir_url_signee_justificatif(admin_client, chemin)
+                        if not url_signee:
+                            st.caption(f"⚠️ Lien indisponible pour ce fichier ({chemin}).")
+                        elif chemin.lower().endswith((".jpg", ".jpeg", ".png")):
+                            st.image(url_signee, width=240)
+                        else:
+                            st.markdown(f"[📄 Ouvrir le document (lien valable 5 min)]({url_signee})")
+            else:
+                st.caption(f"⚠️ Aucun justificatif fourni par {esc(r.get('nom'))}.")
 
 st.markdown(
     "<footer style='margin-top:28px;text-align:center;color:#8b9bb4;font-size:0.8rem;'>"
