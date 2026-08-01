@@ -216,14 +216,18 @@ def incrementer_contact(repet_id):
 
 
 def uploader_photo(fichier):
-    """Upload photo de profil (bucket public)."""
+    """Upload photo de profil (bucket public).
+    Retourne (url_ou_None, message_erreur_ou_None) — n'affiche plus l'erreur
+    directement, car un st.warning() ici serait effacé par le st.rerun()
+    qui suit l'enregistrement du profil. L'appelant conserve le message
+    dans st.session_state pour qu'il survive au rerun.
+    """
     if fichier is None:
-        return None
+        return None, None
 
     valide, err = valider_fichier(fichier, MAX_FILE_SIZE, ALLOWED_IMAGE_TYPES)
     if not valide:
-        st.warning(err)
-        return None
+        return None, err
 
     try:
         ext = fichier.name.split(".")[-1].lower()
@@ -235,20 +239,22 @@ def uploader_photo(fichier):
             fichier.getvalue(),
             {"content-type": fichier.type or "image/jpeg"},
         )
-        return supabase.storage.from_(BUCKET_PHOTOS).get_public_url(nom_fichier)
-    except Exception:
-        st.warning("La photo n'a pas pu être envoyée — le profil sera créé/mis à jour sans photo.")
-        return None
+        return supabase.storage.from_(BUCKET_PHOTOS).get_public_url(nom_fichier), None
+    except Exception as exc:
+        return None, f"La photo n'a pas pu être envoyée ({exc}) — le profil sera créé/mis à jour sans photo."
 
 
 def uploader_justificatifs(fichiers, edit_token):
-    """Upload justificatifs (bucket privé). Noms 100 % générés."""
+    """Upload justificatifs (bucket privé). Noms 100 % générés.
+    Retourne (chemins, messages_erreur) — même principe que uploader_photo.
+    """
     chemins = []
+    messages = []
     token_safe = "".join(ch for ch in str(edit_token) if ch.isalnum() or ch in "-_")
     for fichier in fichiers or []:
         valide, err = valider_fichier(fichier, MAX_FILE_SIZE, ALLOWED_DOC_TYPES)
         if not valide:
-            st.warning(err)
+            messages.append(err)
             continue
         try:
             ext = fichier.name.split(".")[-1].lower()
@@ -261,8 +267,9 @@ def uploader_justificatifs(fichiers, edit_token):
                 {"content-type": fichier.type or "application/octet-stream"},
             )
             chemins.append(chemin)
-        except Exception:
-            st.warning(f"Le fichier « {fichier.name} » n'a pas pu être envoyé.")
+        except Exception as exc:
+            messages.append(f"Le fichier « {fichier.name} » n'a pas pu être envoyé ({exc}).")
+    return chemins, messages
     return chemins
 
 
@@ -729,6 +736,8 @@ with tab_tuteur:
         st.success(
             "✅ Profil enregistré ! Il sera visible après validation par un administrateur."
         )
+        for msg in st.session_state.get("dernier_avertissements_upload", []):
+            st.warning(msg)
         st.warning(
             "⚠️ **Conservez ce code personnel** — c'est le seul moyen de modifier "
             "votre profil plus tard (aucun compte n'est créé)."
@@ -799,7 +808,10 @@ with tab_tuteur:
             ):
                 st.error("Merci de remplir tous les champs obligatoires (*).")
             else:
-                photo_url = uploader_photo(photo)
+                avertissements_upload = []
+                photo_url, err_photo = uploader_photo(photo)
+                if err_photo:
+                    avertissements_upload.append(err_photo)
                 payload = {
                     "nom": nom.strip(),
                     "quartier": quartier.strip(),
@@ -819,13 +831,15 @@ with tab_tuteur:
                 token_genere = inserer_repetiteur(payload)
                 if token_genere:
                     if justificatifs_files:
-                        chemins = uploader_justificatifs(
+                        chemins, err_justificatifs = uploader_justificatifs(
                             justificatifs_files, token_genere
                         )
+                        avertissements_upload.extend(err_justificatifs)
                         if chemins:
                             maj_repetiteur_par_token(
                                 token_genere, {"justificatifs": chemins}
                             )
+                    st.session_state.dernier_avertissements_upload = avertissements_upload
                     st.session_state.profil_ajoute = True
                     st.session_state.dernier_edit_token = token_genere
                     st.rerun()
@@ -861,6 +875,8 @@ with tab_edition:
             st.error("Code invalide. Vérifiez qu'il est correctement copié.")
         else:
             st.success(f"Profil trouvé : **{esc(profil.get('nom'))}**")
+            for msg in st.session_state.pop("dernier_avertissements_edition", []):
+                st.warning(msg)
             with st.form("form_edition"):
                 ec1, ec2 = st.columns(2)
                 with ec1:
@@ -956,19 +972,24 @@ with tab_edition:
                             "presentation": e_bio.strip(),
                             "disponibilites": e_dispo.strip() or None,
                         }
+                        avertissements_upload = []
                         if e_photo is not None:
-                            nouvelle_photo = uploader_photo(e_photo)
+                            nouvelle_photo, err_photo = uploader_photo(e_photo)
+                            if err_photo:
+                                avertissements_upload.append(err_photo)
                             if nouvelle_photo:
                                 updates["photo_url"] = nouvelle_photo
                         if e_justificatifs:
-                            nouveaux = uploader_justificatifs(
+                            nouveaux, err_justificatifs = uploader_justificatifs(
                                 e_justificatifs, token_saisi.strip()
                             )
+                            avertissements_upload.extend(err_justificatifs)
                             updates["justificatifs"] = (
                                 profil.get("justificatifs") or []
                             ) + nouveaux
 
                         if maj_repetiteur_par_token(token_saisi.strip(), updates):
+                            st.session_state.dernier_avertissements_edition = avertissements_upload
                             st.success("✅ Profil mis à jour.")
                             st.rerun()
 
