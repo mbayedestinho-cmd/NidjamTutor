@@ -410,7 +410,7 @@ def admin_login(email, mot_de_passe):
 # ------------------------------------------------------------------
 st.markdown(
     """
-<link rel="preconnect" href="https://fonts.googleapis.com"> <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,600;0,700;1,500;1,600&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"> <style> :root { --bg: #faf8f4; --surface: #ffffff; --border: rgba(20, 20, 20, 0.12); --orange: #d9622f; --orange-dim: #fbe9e1; --ink: #17181c; --muted: #6b6f76; --green: #1f3d2e; --green-dim: #eaf1ec; --yellow: #eab308; --radius: 18px; --shadow: 0 8px 28px rgba(23, 24, 28, 0.06); } html, body, .stApp { background: var(--bg); color: var(--ink); font-family: 'Inter', -apple-system, sans-serif; } [data-testid="stHeader"] { background: transparent; } h1, h2, h3 { font-family: 'Inter', sans-serif; letter-spacing: -0.02em; color: var(--ink); } p, span, label, div { color: var(--ink); } em { font-family: 'Fraunces', serif; font-style: italic; font-weight: 500; color: var(--orange); } .topbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 4px 18px; border-bottom: 1px solid var(--border); margin-bottom: 22px; } .topbar .brand-group { display: flex; align-items: center; gap: 12px; } .logo { width: 40px; height: 40px; border-radius: 50%; background: var(--ink); display: grid; place-items: center; font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.15rem; color: #fff; flex-shrink: 0; } .brand h1 { font-size: 1.25rem; font-weight: 800; margin: 0; } .brand h1 span { color: var(--orange); } .brand p { color: var(--muted); font-size: 0.8rem; margin: 0; font-weight: 400; } .kicker { display: flex; align-items: center; gap: 8px; color: var(--orange); font-size: 0.75rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 10px; } .kicker::before { content: ""; width: 22px; height: 2px; background: var(--orange); display: inline-block; } .hero { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 30px 28px; margin-bottom: 20px; box-shadow: var(--shadow); } .hero h2 { font-size: 2rem; font-weight: 800; line-height: 1.1; margin: 0 0 10px; } .hero p { color: var(--muted); font-size: 0.98rem; margin: 0; max-width: 640px; } .stat { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 14px; text-align: center; } .stat strong { display: block; font-size: 1.4rem; font-weight: 800; color: var(--orange); } .stat span { color: var(--muted); font-size: 0.78rem; } .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; box-shadow: var(--shadow); margin-bottom: 14px; } .card-head { display: flex; gap: 12px; align-items: center; margin-bottom: 10px; } .avatar { width: 46px; height: 46px; border-radius: 50%; background: var(--yellow); display: grid; place-items: center; font-family: 'Fraunces', serif; font-weight: 600; font-style: italic; color: var(--ink); flex-shrink: 0; } .avatar-img { width: 46px; height: 46px; border-radius: 50%; object-fit: cover; flex-shrink: 0; border: 1px solid var(--border); } .card-head h3 { font-size: 1.05rem; font-weight: 700; margin: 0; } .card-head .meta { color: var(--muted); font-size: 0.8rem; } .note { font-size: 0.78rem; color: var(--yellow); margin-bottom: 6px; font-weight: 600; } .note.muted { color: var(--muted); font-weight: 400; } .badges { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; } .badge { background: var(--orange-dim); color: var(--orange); border: 1px solid transparent; font-size: 0.72rem; font-weight: 700; padding: 4px 10px; border-radius: 999px; text-transform: uppercase; letter-spacing: 0.02em; } .badge.muted { background: #f1f0ec; color: var(--muted); } .badge.nouveau { background: var(--green-dim); color: var(--green); } .card p.desc { color: var(--muted); font-size: 0.88rem; } .price { font-weight: 800; color: var(--ink); font-size: 1.05rem; } .price span { color: var(--muted); font-weight: 500; font-size: 0.78rem; text-transform: uppercase; } .empty { text-align: center; padding: 40px 16px; color: var(--muted); border: 1px dashed var(--border); border-radius: var(--radius); background: var(--surface); } .status { font-size: 0.78rem; font-weight: 700; padding: 4px 12px; border-radius: 999px; } .status.actif { background: var(--green-dim); color: var(--green); } .status.attente { background: #fdf1de; color: #b8790a; } .stTextInput input, .stNumberInput input, .stTextArea textarea, .stSelectbox > div > div, .stMultiSelect > div > div { background: var(--surface) !important; border: 1px solid var(--border) !important; border-radius: 10px !important; color: var(--ink) !important; } .stButton > button, .stFormSubmitButton > button { background: var(--ink) !important; color: #fff !important; border: none !important; border-radius: 999px !important; font-weight: 700 !important; padding: 0.5rem 1.4rem !important; } .stButton > button:hover, .stFormSubmitButton > button:hover { background: var(--orange) !important; } .stTabs [data-baseweb="tab-list"] { gap: 20px; border-bottom: 1px solid var(--border); } .stTabs [data-baseweb="tab"] { background: transparent; color: var(--muted); font-weight: 600; padding: 8px 0; } .stTabs [aria-selected="true"] { color: var(--orange) !important; border-bottom: 2px solid var(--orange) !important; } footer, footer p { color: var(--muted) !important; } </style>
+<link rel="preconnect" href="https://fonts.googleapis.com"> <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,600;0,700;1,500;1,600&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"> <style> :root { --bg: #faf8f4; --surface: #ffffff; --border: rgba(20, 20, 20, 0.12); --orange: #d9622f; --orange-dim: #fbe9e1; --ink: #17181c; --muted: #6b6f76; --green: #1f3d2e; --green-dim: #eaf1ec; --yellow: #eab308; --radius: 18px; --shadow: 0 8px 28px rgba(23, 24, 28, 0.06); } html, body, .stApp { background: var(--bg); color: var(--ink); font-family: 'Inter', -apple-system, sans-serif; } [data-testid="stHeader"] { background: transparent; } h1, h2, h3 { font-family: 'Inter', sans-serif; letter-spacing: -0.02em; color: var(--ink); } p, span, label, div { color: var(--ink); } em { font-family: 'Fraunces', serif; font-style: italic; font-weight: 500; color: var(--orange); } .topbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 4px 18px; border-bottom: 1px solid var(--border); margin-bottom: 22px; } .topbar .brand-group { display: flex; align-items: center; gap: 12px; } .logo { width: 40px; height: 40px; border-radius: 50%; background: var(--ink); display: grid; place-items: center; font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.15rem; color: #fff; flex-shrink: 0; } .brand h1 { font-size: 1.25rem; font-weight: 800; margin: 0; } .brand h1 span { color: var(--orange); } .brand p { color: var(--muted); font-size: 0.8rem; margin: 0; font-weight: 400; } .kicker { display: flex; align-items: center; gap: 8px; color: var(--orange); font-size: 0.75rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 10px; } .kicker::before { content: ""; width: 22px; height: 2px; background: var(--orange); display: inline-block; } .hero { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 30px 28px; margin-bottom: 20px; box-shadow: var(--shadow); } .hero h2 { font-size: 2rem; font-weight: 800; line-height: 1.1; margin: 0 0 10px; } .hero p { color: var(--muted); font-size: 0.98rem; margin: 0; max-width: 640px; } .stat { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 14px; text-align: center; } .stat strong { display: block; font-size: 1.4rem; font-weight: 800; color: var(--orange); } .stat span { color: var(--muted); font-size: 0.78rem; } .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; box-shadow: var(--shadow); margin-bottom: 14px; } .card-head { display: flex; gap: 12px; align-items: center; margin-bottom: 10px; } .avatar { width: 46px; height: 46px; border-radius: 50%; background: var(--yellow); display: grid; place-items: center; font-family: 'Fraunces', serif; font-weight: 600; font-style: italic; color: var(--ink); flex-shrink: 0; } .avatar-img { width: 46px; height: 46px; border-radius: 50%; object-fit: cover; flex-shrink: 0; border: 1px solid var(--border); } .card-head h3 { font-size: 1.05rem; font-weight: 700; margin: 0; } .card-head .meta { color: var(--muted); font-size: 0.8rem; } .note { font-size: 0.78rem; color: var(--yellow); margin-bottom: 6px; font-weight: 600; } .note.muted { color: var(--muted); font-weight: 400; } .badges { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; } .badge { background: var(--orange-dim); color: var(--orange); border: 1px solid transparent; font-size: 0.72rem; font-weight: 700; padding: 4px 10px; border-radius: 999px; text-transform: uppercase; letter-spacing: 0.02em; } .badge.muted { background: #f1f0ec; color: var(--muted); } .badge.nouveau { background: var(--green-dim); color: var(--green); } .card p.desc { color: var(--muted); font-size: 0.88rem; } .price { font-weight: 800; color: var(--ink); font-size: 1.05rem; } .price span { color: var(--muted); font-weight: 500; font-size: 0.78rem; text-transform: uppercase; } .empty { text-align: center; padding: 40px 16px; color: var(--muted); border: 1px dashed var(--border); border-radius: var(--radius); background: var(--surface); } .status { font-size: 0.78rem; font-weight: 700; padding: 4px 12px; border-radius: 999px; } .status.actif { background: var(--green-dim); color: var(--green); } .status.attente { background: #fdf1de; color: #b8790a; } .stTextInput input, .stNumberInput input, .stTextArea textarea, .stSelectbox > div > div, .stMultiSelect > div > div { background: var(--surface) !important; border: 1px solid var(--border) !important; border-radius: 10px !important; color: var(--ink) !important; } .stButton > button { background: var(--ink) !important; color: #fff !important; border: none !important; border-radius: 999px !important; font-weight: 700 !important; padding: 0.5rem 1.4rem !important; } .stButton > button:hover { background: var(--orange) !important; } .stFormSubmitButton > button { background: var(--orange) !important; color: #fff !important; border: none !important; border-radius: 10px !important; font-weight: 700 !important; font-size: 1rem !important; padding: 0.9rem 1.4rem !important; width: 100% !important; } .stFormSubmitButton > button:hover { background: var(--ink) !important; } [data-testid="stWidgetLabel"] p { text-transform: uppercase; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.04em; color: var(--ink); } .stTextInput input, .stNumberInput input, .stTextArea textarea { padding: 0.7rem 0.9rem !important; } .stTabs [data-baseweb="tab-list"] { gap: 20px; border-bottom: 1px solid var(--border); } .stTabs [data-baseweb="tab"] { background: transparent; color: var(--muted); font-weight: 600; padding: 8px 0; } .stTabs [aria-selected="true"] { color: var(--orange) !important; border-bottom: 2px solid var(--orange) !important; } footer, footer p { color: var(--muted) !important; } .ticker-wrap { background: var(--ink); overflow: hidden; margin-bottom: 22px; border-radius: 999px; } .ticker-track { display: inline-flex; width: max-content; white-space: nowrap; animation: ticker-scroll 24s linear infinite; padding: 14px 0; } .ticker-track:hover { animation-play-state: paused; } .ticker-item { font-family: 'Fraunces', serif; font-style: italic; font-weight: 600; color: #fff; font-size: 1.05rem; padding: 0 22px; } .ticker-dot { color: var(--orange); font-style: normal; } @keyframes ticker-scroll { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } } </style>
 """,
     unsafe_allow_html=True,
 )
@@ -427,6 +427,11 @@ st.markdown(
   </div>
 </div>
 """,
+    unsafe_allow_html=True,
+)
+
+st.markdown(
+    '''<div class="ticker-wrap"><div class="ticker-track"><span class="ticker-item">Mathématiques</span><span class="ticker-item ticker-dot">✦</span><span class="ticker-item">Français</span><span class="ticker-item ticker-dot">✦</span><span class="ticker-item">Physique</span><span class="ticker-item ticker-dot">✦</span><span class="ticker-item">Anglais</span><span class="ticker-item ticker-dot">✦</span><span class="ticker-item">Sciences</span><span class="ticker-item ticker-dot">✦</span><span class="ticker-item">Informatique</span><span class="ticker-item ticker-dot">✦</span><span class="ticker-item">Chimie</span><span class="ticker-item ticker-dot">✦</span><span class="ticker-item">Histoire-Géo</span><span class="ticker-item ticker-dot">✦</span><span class="ticker-item">Mathématiques</span><span class="ticker-item ticker-dot">✦</span><span class="ticker-item">Français</span><span class="ticker-item ticker-dot">✦</span><span class="ticker-item">Physique</span><span class="ticker-item ticker-dot">✦</span><span class="ticker-item">Anglais</span><span class="ticker-item ticker-dot">✦</span><span class="ticker-item">Sciences</span><span class="ticker-item ticker-dot">✦</span><span class="ticker-item">Informatique</span><span class="ticker-item ticker-dot">✦</span><span class="ticker-item">Chimie</span><span class="ticker-item ticker-dot">✦</span><span class="ticker-item">Histoire-Géo</span><span class="ticker-item ticker-dot">✦</span></div></div>''',
     unsafe_allow_html=True,
 )
 
@@ -665,37 +670,9 @@ with tab_parent:
 # ------------------------------------------------------------------
 # ONGLET RÉPÉTITEUR
 # ------------------------------------------------------------------
-with tab_tuteur:
-    st.markdown(
-        """
-    <div class="hero">
-      <div class="kicker">Vous enseignez ?</div>
-      <h2>Votre savoir peut <em>changer une trajectoire.</em></h2>
-      <p>Créez votre profil en quelques minutes. Les parents pourront vous trouver et vous contacter.</p>
-    </div>
-    """,
-        unsafe_allow_html=True,
-    )
-
-    if st.session_state.get("profil_ajoute"):
-        token_genere = st.session_state.get("dernier_edit_token", "")
-        lien = lien_edition(token_genere)
-        st.success(
-            "✅ Profil enregistré ! Il sera visible après validation par un administrateur."
-        )
-        for msg in st.session_state.get("dernier_avertissements_upload", []):
-            st.warning(msg)
-        st.warning(
-            "⚠️ **Conservez ce code personnel** — c'est le seul moyen de modifier "
-            "votre profil plus tard (aucun compte n'est créé)."
-        )
-        st.code(lien or token_genere, language=None)
-        if not lien:
-            st.caption(
-                "Collez ce code dans l'onglet « ✏️ Modifier mon profil » pour l'utiliser."
-            )
-        st.session_state.profil_ajoute = False
-
+@st.dialog("Publier mon profil", width="large")
+def dialog_publier_profil():
+    st.caption("— REJOINDRE TUTEURTD")
     with st.form("form_tuteur", clear_on_submit=True):
         fc1, fc2 = st.columns(2)
         with fc1:
@@ -741,6 +718,9 @@ with tab_tuteur:
             "Justificatifs — diplôme, CNI (optionnel, max 5 Mo / fichier)",
             type=["jpg", "jpeg", "png", "pdf"],
             accept_multiple_files=True,
+        )
+        st.caption(
+            "* Champs obligatoires. Un administrateur doit valider votre profil avant qu'il soit visible."
         )
 
         submitted = st.form_submit_button("Publier mon profil")
@@ -795,9 +775,40 @@ with tab_tuteur:
                     st.session_state.dernier_edit_token = token_genere
                     st.rerun()
 
-    st.caption(
-        "* Champs obligatoires. Un administrateur doit valider votre profil avant qu'il soit visible."
+
+with tab_tuteur:
+    st.markdown(
+        """
+    <div class="hero">
+      <div class="kicker">Vous enseignez ?</div>
+      <h2>Votre savoir peut <em>changer une trajectoire.</em></h2>
+      <p>Créez votre profil en quelques minutes. Les parents pourront vous trouver et vous contacter.</p>
+    </div>
+    """,
+        unsafe_allow_html=True,
     )
+
+    if st.session_state.get("profil_ajoute"):
+        token_genere = st.session_state.get("dernier_edit_token", "")
+        lien = lien_edition(token_genere)
+        st.success(
+            "✅ Profil enregistré ! Il sera visible après validation par un administrateur."
+        )
+        for msg in st.session_state.get("dernier_avertissements_upload", []):
+            st.warning(msg)
+        st.warning(
+            "⚠️ **Conservez ce code personnel** — c'est le seul moyen de modifier "
+            "votre profil plus tard (aucun compte n'est créé)."
+        )
+        st.code(lien or token_genere, language=None)
+        if not lien:
+            st.caption(
+                "Collez ce code dans l'onglet « ✏️ Modifier mon profil » pour l'utiliser."
+            )
+        st.session_state.profil_ajoute = False
+
+    if st.button("+ Publier mon profil", key="ouvrir_dialog_publier"):
+        dialog_publier_profil()
 
 # ------------------------------------------------------------------
 # ONGLET ÉDITION
