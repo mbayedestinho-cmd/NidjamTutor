@@ -410,92 +410,133 @@ def admin_login(email, mot_de_passe):
 # ------------------------------------------------------------------
 st.markdown(
     """
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,600;0,700;1,500;1,600&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root {
-    --bg: #0b1220;
-    --surface: #121a2b;
-    --border: rgba(94, 234, 212, 0.18);
-    --teal: #2dd4bf;
-    --teal-dim: rgba(45, 212, 191, 0.12);
-    --text: #e8eef7;
-    --muted: #8b9bb4;
-    --warning: #fbbf24;
-    --radius: 16px;
-    --shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+    --bg: #faf8f4;
+    --surface: #ffffff;
+    --border: rgba(20, 20, 20, 0.12);
+    --orange: #d9622f;
+    --orange-dim: #fbe9e1;
+    --ink: #17181c;
+    --muted: #6b6f76;
+    --green: #1f3d2e;
+    --green-dim: #eaf1ec;
+    --yellow: #eab308;
+    --radius: 18px;
+    --shadow: 0 8px 28px rgba(23, 24, 28, 0.06);
 }
-.stApp {
-    background:
-        radial-gradient(ellipse at 20% 0%, rgba(45, 212, 191, 0.12), transparent 50%),
-        radial-gradient(ellipse at 80% 100%, rgba(99, 102, 241, 0.1), transparent 45%),
-        var(--bg);
-    color: var(--text);
+html, body, .stApp {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Inter', -apple-system, sans-serif;
 }
 [data-testid="stHeader"] { background: transparent; }
-h1, h2, h3, p, span, label, div { color: var(--text); }
-.topbar { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+h1, h2, h3 { font-family: 'Inter', sans-serif; letter-spacing: -0.02em; color: var(--ink); }
+p, span, label, div { color: var(--ink); }
+em { font-family: 'Fraunces', serif; font-style: italic; font-weight: 500; color: var(--orange); }
+
+/* Barre d'identité */
+.topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px; padding: 10px 4px 18px; border-bottom: 1px solid var(--border); margin-bottom: 22px;
+}
+.topbar .brand-group { display: flex; align-items: center; gap: 12px; }
 .logo {
-    width: 42px; height: 42px; border-radius: 12px;
-    background: linear-gradient(135deg, var(--teal), #6366f1);
-    display: grid; place-items: center; font-weight: 700; font-size: 1.1rem; color: #06201c;
+    width: 40px; height: 40px; border-radius: 50%;
+    background: var(--ink);
+    display: grid; place-items: center; font-family: 'Fraunces', serif; font-weight: 600;
+    font-size: 1.15rem; color: #fff; flex-shrink: 0;
 }
-.brand h1 { font-size: 1.35rem; letter-spacing: -0.02em; margin: 0; }
-.brand p { color: var(--muted); font-size: 0.82rem; margin: 0; }
+.brand h1 { font-size: 1.25rem; font-weight: 800; margin: 0; }
+.brand h1 span { color: var(--orange); }
+.brand p { color: var(--muted); font-size: 0.8rem; margin: 0; font-weight: 400; }
+
+/* Bloc hero éditorial */
+.kicker {
+    display: flex; align-items: center; gap: 8px; color: var(--orange);
+    font-size: 0.75rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+    margin-bottom: 10px;
+}
+.kicker::before { content: ""; width: 22px; height: 2px; background: var(--orange); display: inline-block; }
 .hero {
-    background: linear-gradient(135deg, rgba(45, 212, 191, 0.1), rgba(99, 102, 241, 0.08));
-    border: 1px solid var(--border); border-radius: var(--radius);
-    padding: 22px 20px; margin-bottom: 18px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 30px 28px; margin-bottom: 20px; box-shadow: var(--shadow);
 }
-.hero h2 { font-size: 1.45rem; margin-bottom: 6px; }
-.hero p { color: var(--muted); font-size: 0.95rem; margin: 0; }
+.hero h2 { font-size: 2rem; font-weight: 800; line-height: 1.1; margin: 0 0 10px; }
+.hero p { color: var(--muted); font-size: 0.98rem; margin: 0; max-width: 640px; }
+
+/* Statistiques */
 .stat {
     background: var(--surface); border: 1px solid var(--border);
-    border-radius: 12px; padding: 12px; text-align: center;
+    border-radius: 14px; padding: 14px; text-align: center;
 }
-.stat strong { display: block; font-size: 1.25rem; color: var(--teal); }
+.stat strong { display: block; font-size: 1.4rem; font-weight: 800; color: var(--orange); }
 .stat span { color: var(--muted); font-size: 0.78rem; }
+
+/* Carte profil répétiteur */
 .card {
     background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
-    padding: 16px; box-shadow: var(--shadow); margin-bottom: 14px;
+    padding: 18px; box-shadow: var(--shadow); margin-bottom: 14px;
 }
-.card-head { display: flex; gap: 12px; align-items: center; margin-bottom: 8px; }
+.card-head { display: flex; gap: 12px; align-items: center; margin-bottom: 10px; }
 .avatar {
-    width: 48px; height: 48px; border-radius: 50%;
-    background: linear-gradient(145deg, #2dd4bf, #6366f1);
-    display: grid; place-items: center; font-weight: 700; color: #06201c; flex-shrink: 0;
+    width: 46px; height: 46px; border-radius: 50%;
+    background: var(--yellow);
+    display: grid; place-items: center; font-family: 'Fraunces', serif; font-weight: 600;
+    font-style: italic; color: var(--ink); flex-shrink: 0;
 }
 .avatar-img {
-    width: 48px; height: 48px; border-radius: 50%; object-fit: cover; flex-shrink: 0;
+    width: 46px; height: 46px; border-radius: 50%; object-fit: cover; flex-shrink: 0;
     border: 1px solid var(--border);
 }
-.card-head h3 { font-size: 1.02rem; margin: 0; }
+.card-head h3 { font-size: 1.05rem; font-weight: 700; margin: 0; }
 .card-head .meta { color: var(--muted); font-size: 0.8rem; }
-.note { font-size: 0.78rem; color: var(--warning); margin-bottom: 6px; }
-.note.muted { color: var(--muted); }
-.badges { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.note { font-size: 0.78rem; color: var(--yellow); margin-bottom: 6px; font-weight: 600; }
+.note.muted { color: var(--muted); font-weight: 400; }
+.badges { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
 .badge {
-    background: var(--teal-dim); color: var(--teal); border: 1px solid rgba(45, 212, 191, 0.25);
-    font-size: 0.72rem; font-weight: 600; padding: 3px 8px; border-radius: 999px;
+    background: var(--orange-dim); color: var(--orange); border: 1px solid transparent;
+    font-size: 0.72rem; font-weight: 700; padding: 4px 10px; border-radius: 999px;
+    text-transform: uppercase; letter-spacing: 0.02em;
 }
 .badge.muted {
-    background: rgba(139, 155, 180, 0.12); color: var(--muted);
-    border-color: rgba(139, 155, 180, 0.2);
+    background: #f1f0ec; color: var(--muted);
 }
 .badge.nouveau {
-    background: rgba(251, 191, 36, 0.15); color: var(--warning);
-    border-color: rgba(251, 191, 36, 0.3);
+    background: var(--green-dim); color: var(--green);
 }
-.card p.desc { color: var(--muted); font-size: 0.86rem; }
-.price { font-weight: 700; color: var(--text); font-size: 0.95rem; }
-.price span { color: var(--muted); font-weight: 500; font-size: 0.78rem; }
+.card p.desc { color: var(--muted); font-size: 0.88rem; }
+.price { font-weight: 800; color: var(--ink); font-size: 1.05rem; }
+.price span { color: var(--muted); font-weight: 500; font-size: 0.78rem; text-transform: uppercase; }
 .empty {
-    text-align: center; padding: 36px 16px; color: var(--muted);
-    border: 1px dashed var(--border); border-radius: var(--radius);
+    text-align: center; padding: 40px 16px; color: var(--muted);
+    border: 1px dashed var(--border); border-radius: var(--radius); background: var(--surface);
 }
 .status {
-    font-size: 0.78rem; font-weight: 600; padding: 3px 10px; border-radius: 999px;
+    font-size: 0.78rem; font-weight: 700; padding: 4px 12px; border-radius: 999px;
 }
-.status.actif { background: rgba(45, 212, 191, 0.15); color: var(--teal); }
-.status.attente { background: rgba(251, 191, 36, 0.15); color: var(--warning); }
+.status.actif { background: var(--green-dim); color: var(--green); }
+.status.attente { background: #fdf1de; color: #b8790a; }
+
+/* Widgets Streamlit natifs harmonisés */
+.stTextInput input, .stNumberInput input, .stTextArea textarea,
+.stSelectbox > div > div, .stMultiSelect > div > div {
+    background: var(--surface) !important; border: 1px solid var(--border) !important;
+    border-radius: 10px !important; color: var(--ink) !important;
+}
+.stButton > button, .stFormSubmitButton > button {
+    background: var(--ink) !important; color: #fff !important; border: none !important;
+    border-radius: 999px !important; font-weight: 700 !important; padding: 0.5rem 1.4rem !important;
+}
+.stButton > button:hover, .stFormSubmitButton > button:hover { background: var(--orange) !important; }
+.stTabs [data-baseweb="tab-list"] { gap: 20px; border-bottom: 1px solid var(--border); }
+.stTabs [data-baseweb="tab"] {
+    background: transparent; color: var(--muted); font-weight: 600; padding: 8px 0;
+}
+.stTabs [aria-selected="true"] { color: var(--orange) !important; border-bottom: 2px solid var(--orange) !important; }
+footer, footer p { color: var(--muted) !important; }
 </style>
 """,
     unsafe_allow_html=True,
@@ -504,10 +545,12 @@ h1, h2, h3, p, span, label, div { color: var(--text); }
 st.markdown(
     """
 <div class="topbar">
-  <div class="logo">T</div>
-  <div class="brand">
-    <h1>TuteurTD</h1>
-    <p>Répétiteurs de maison à N'Djamena</p>
+  <div class="brand-group">
+    <div class="logo">T</div>
+    <div class="brand">
+      <h1>Tuteur<span>TD</span></h1>
+      <p>Répétiteurs de maison à N'Djamena</p>
+    </div>
   </div>
 </div>
 """,
@@ -535,7 +578,8 @@ with tab_parent:
     st.markdown(
         """
     <div class="hero">
-      <h2>Trouvez le bon répétiteur</h2>
+      <div class="kicker">Apprendre mieux, à N'Djamena</div>
+      <h2>Trouvez le bon <em>répétiteur.</em></h2>
       <p>Filtrez par matière, niveau, quartier et budget. Contactez directement sur WhatsApp.</p>
     </div>
     """,
@@ -752,7 +796,8 @@ with tab_tuteur:
     st.markdown(
         """
     <div class="hero">
-      <h2>Devenir répétiteur</h2>
+      <div class="kicker">Vous enseignez ?</div>
+      <h2>Votre savoir peut <em>changer une trajectoire.</em></h2>
       <p>Créez votre profil en quelques minutes. Les parents pourront vous trouver et vous contacter.</p>
     </div>
     """,
@@ -888,7 +933,8 @@ with tab_edition:
     st.markdown(
         """
     <div class="hero">
-      <h2>Modifier mon profil</h2>
+      <div class="kicker">Mon espace</div>
+      <h2>Ajustez votre <em>profil.</em></h2>
       <p>Collez votre code personnel reçu à l'inscription pour mettre à jour vos informations.</p>
     </div>
     """,
@@ -1036,7 +1082,8 @@ with tab_admin:
         st.markdown(
             """
         <div class="hero">
-          <h2>Connexion admin</h2>
+          <div class="kicker">Accès réservé</div>
+          <h2>Connexion <em>admin.</em></h2>
           <p>Connectez-vous avec votre compte administrateur Supabase.</p>
         </div>
         """,
@@ -1054,7 +1101,8 @@ with tab_admin:
             st.markdown(
                 """
             <div class="hero">
-              <h2>Validation des profils</h2>
+              <div class="kicker">Back-office</div>
+              <h2>Validation des <em>profils.</em></h2>
               <p>Activer, suspendre, contrôler la qualité des profils.</p>
             </div>
             """,
@@ -1074,7 +1122,7 @@ with tab_admin:
         ):
             col.markdown(f"**{label}**")
         st.markdown(
-            "<hr style='border-color: rgba(94,234,212,0.18); margin: 4px 0 8px;'>",
+            "<hr style='border-color: rgba(20,20,20,0.12); margin: 4px 0 8px;'>",
             unsafe_allow_html=True,
         )
 
@@ -1136,7 +1184,7 @@ with tab_admin:
                 st.caption(f"⚠️ Aucun justificatif fourni par {esc(r.get('nom'))}.")
 
 st.markdown(
-    "<footer style='margin-top:28px;text-align:center;color:#8b9bb4;font-size:0.8rem;'>"
+    "<footer style='margin-top:28px;text-align:center;color:#6b6f76;font-size:0.8rem;'>"
     "TuteurTD · Projet répétiteurs de maison · N'Djamena</footer>",
     unsafe_allow_html=True,
 )
