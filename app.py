@@ -437,7 +437,6 @@ h1, h2, h3 { font-family: 'Inter', sans-serif; letter-spacing: -0.02em; color: v
 p, span, label, div { color: var(--ink); }
 em { font-family: 'Fraunces', serif; font-style: italic; font-weight: 500; color: var(--orange); }
 
-/* Barre d'identité */
 .topbar {
     display: flex; align-items: center; justify-content: space-between;
     gap: 12px; padding: 10px 4px 18px; border-bottom: 1px solid var(--border); margin-bottom: 22px;
@@ -453,7 +452,6 @@ em { font-family: 'Fraunces', serif; font-style: italic; font-weight: 500; color
 .brand h1 span { color: var(--orange); }
 .brand p { color: var(--muted); font-size: 0.8rem; margin: 0; font-weight: 400; }
 
-/* Bloc hero éditorial */
 .kicker {
     display: flex; align-items: center; gap: 8px; color: var(--orange);
     font-size: 0.75rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
@@ -467,7 +465,6 @@ em { font-family: 'Fraunces', serif; font-style: italic; font-weight: 500; color
 .hero h2 { font-size: 2rem; font-weight: 800; line-height: 1.1; margin: 0 0 10px; }
 .hero p { color: var(--muted); font-size: 0.98rem; margin: 0; max-width: 640px; }
 
-/* Statistiques */
 .stat {
     background: var(--surface); border: 1px solid var(--border);
     border-radius: 14px; padding: 14px; text-align: center;
@@ -475,7 +472,6 @@ em { font-family: 'Fraunces', serif; font-style: italic; font-weight: 500; color
 .stat strong { display: block; font-size: 1.4rem; font-weight: 800; color: var(--orange); }
 .stat span { color: var(--muted); font-size: 0.78rem; }
 
-/* Carte profil répétiteur */
 .card {
     background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
     padding: 18px; box-shadow: var(--shadow); margin-bottom: 14px;
@@ -520,7 +516,6 @@ em { font-family: 'Fraunces', serif; font-style: italic; font-weight: 500; color
 .status.actif { background: var(--green-dim); color: var(--green); }
 .status.attente { background: #fdf1de; color: #b8790a; }
 
-/* Widgets Streamlit natifs harmonisés */
 .stTextInput input, .stNumberInput input, .stTextArea textarea,
 .stSelectbox > div > div, .stMultiSelect > div > div {
     background: var(--surface) !important; border: 1px solid var(--border) !important;
